@@ -1,0 +1,7 @@
+{
+  "name": "AI Pilot Forge",
+  "description": "Personalized, outcome-driven AI learning system for mid-career professionals to build and deploy job-specific AI pilots in 60 days.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
