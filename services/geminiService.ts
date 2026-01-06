@@ -1,13 +1,8 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
-/**
- * Fetches job-specific context using Gemini based on the user's role and domain.
- * Follows @google/genai guidelines by initializing inside the function to ensure the current API key is used.
- */
 export const getJobSpecificContext = async (role: string, domain: string, tool: string) => {
   try {
-    // Initialize GoogleGenAI instance right before the call as per guidelines
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -16,10 +11,39 @@ export const getJobSpecificContext = async (role: string, domain: string, tool: 
         temperature: 0.7,
       }
     });
-    // Correctly accessing the text property (not a method) as per the latest SDK spec
     return response.text;
   } catch (error) {
     console.error("Gemini Error:", error);
     return "This skill will help you automate repetitive tasks and drive 10x better decision-making in your current role.";
   }
+};
+
+/**
+ * Generates a realistic dummy dataset schema and rows for a specific use case.
+ */
+export const generateAILearningContent = async (nodeLabel: string, domain: string) => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: `Act as a senior curriculum designer for an Indian edtech startup. 
+    Create a highly realistic dummy dataset schema and 3 rows of data for a learning module titled "${nodeLabel}" in the ${domain} domain. 
+    The data must feel uniquely Indian (city names like Ludhiana, specific business terms like 'GST compliance' or 'Lorry Hire'). 
+    Return as JSON.`,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          context: { type: Type.STRING },
+          cookbookSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
+          datasetPreview: { 
+            type: Type.ARRAY, 
+            items: { type: Type.OBJECT, properties: {} } 
+          }
+        }
+      }
+    }
+  });
+  
+  return JSON.parse(response.text);
 };

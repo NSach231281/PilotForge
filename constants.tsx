@@ -2,7 +2,6 @@
 import { SkillNode, SkillStatus, UseCase } from './types';
 
 export const SKILL_NODES: SkillNode[] = [
-  // Shared Foundation
   {
     id: 'data-hygiene',
     label: 'Data Hygiene',
@@ -11,10 +10,10 @@ export const SKILL_NODES: SkillNode[] = [
     dependencies: [],
     type: 'data',
     domain: 'shared',
-    difficulty: 'basic'
+    difficulty: 'basic',
+    // Added missing materials field
+    materials: []
   },
-  
-  // Operations & Supply Chain Graph
   {
     id: 'ops-forecasting',
     label: 'Demand Forecasting',
@@ -23,7 +22,9 @@ export const SKILL_NODES: SkillNode[] = [
     dependencies: ['data-hygiene'],
     type: 'model',
     domain: 'ops',
-    difficulty: 'intermediate'
+    difficulty: 'intermediate',
+    // Added missing materials field
+    materials: []
   },
   {
     id: 'ops-optimization',
@@ -33,7 +34,9 @@ export const SKILL_NODES: SkillNode[] = [
     dependencies: ['ops-forecasting'],
     type: 'optimization',
     domain: 'ops',
-    difficulty: 'intermediate'
+    difficulty: 'intermediate',
+    // Added missing materials field
+    materials: []
   },
   {
     id: 'ops-advanced-sensing',
@@ -43,10 +46,10 @@ export const SKILL_NODES: SkillNode[] = [
     dependencies: ['ops-optimization'],
     type: 'model',
     domain: 'ops',
-    difficulty: 'advanced'
+    difficulty: 'advanced',
+    // Added missing materials field
+    materials: []
   },
-
-  // Marketing & Sales Graph
   {
     id: 'mkt-classification',
     label: 'Lead Prioritization',
@@ -55,7 +58,9 @@ export const SKILL_NODES: SkillNode[] = [
     dependencies: ['data-hygiene'],
     type: 'model',
     domain: 'mkt',
-    difficulty: 'intermediate'
+    difficulty: 'intermediate',
+    // Added missing materials field
+    materials: []
   },
   {
     id: 'mkt-segmentation',
@@ -65,7 +70,9 @@ export const SKILL_NODES: SkillNode[] = [
     dependencies: ['mkt-classification'],
     type: 'model',
     domain: 'mkt',
-    difficulty: 'intermediate'
+    difficulty: 'intermediate',
+    // Added missing materials field
+    materials: []
   },
   {
     id: 'mkt-advanced-personalization',
@@ -75,22 +82,22 @@ export const SKILL_NODES: SkillNode[] = [
     dependencies: ['mkt-segmentation'],
     type: 'model',
     domain: 'mkt',
-    difficulty: 'advanced'
+    difficulty: 'advanced',
+    // Added missing materials field
+    materials: []
   },
-
-  // Deployment (Shared End Goal)
   {
     id: 'deployment-final',
     label: 'Pilot Deployment',
     description: 'Automating your model output to a live business workflow.',
     status: SkillStatus.LOCKED,
-    dependencies: ['ops-optimization', 'mkt-segmentation'], // Flexible based on path
+    dependencies: ['ops-optimization', 'mkt-segmentation'],
     type: 'deployment',
     domain: 'shared',
-    difficulty: 'advanced'
+    difficulty: 'advanced',
+    // Added missing materials field
+    materials: []
   },
-
-  // Remediation Nodes
   {
     id: 'remedial-excel-logic',
     label: 'Logic Foundations',
@@ -99,7 +106,9 @@ export const SKILL_NODES: SkillNode[] = [
     dependencies: [],
     type: 'remediation',
     domain: 'shared',
-    difficulty: 'basic'
+    difficulty: 'basic',
+    // Added missing materials field
+    materials: []
   }
 ];
 
@@ -117,6 +126,8 @@ export const MOCK_USE_CASES: UseCase[] = [
       { sku: 'SKU-9902', warehouse: 'MUM', stock: 120, avg_daily_sales: 85, lead_time_days: 2 },
       { sku: 'SKU-9903', warehouse: 'DEL', stock: 310, avg_daily_sales: 12, lead_time_days: 5 }
     ],
+    // Added missing verificationLogic field
+    verificationLogic: [],
     cookbook: {
       steps: [
         'Normalize date formats in the ledger.',
@@ -143,6 +154,8 @@ export const MOCK_USE_CASES: UseCase[] = [
       { lead_id: 'L-542', city: 'Surat', web_visits: 2, content_downloads: 0, last_active: '2023-09-28' },
       { lead_id: 'L-543', city: 'Lucknow', web_visits: 35, content_downloads: 4, last_active: '2023-10-02' }
     ],
+    // Added missing verificationLogic field
+    verificationLogic: [],
     cookbook: {
       steps: [
         'Cleanse leads with invalid phone formats.',

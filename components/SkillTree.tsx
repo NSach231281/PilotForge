@@ -42,7 +42,7 @@ const SkillTree: React.FC<SkillTreeProps> = ({ nodes, onNodeClick }) => {
             startX: fromRect.left + fromRect.width / 2 - containerRect.left,
             startY: fromRect.top + fromRect.height / 2 - containerRect.top,
             endX: toRect.left + toRect.width / 2 - containerRect.left,
-            endY: toRect.top + toRect.height / 2 - containerRect.top,
+            endY: toRect.top + toRect.height / 2 - containerRect.top
           });
         }
       });
@@ -74,7 +74,6 @@ const SkillTree: React.FC<SkillTreeProps> = ({ nodes, onNodeClick }) => {
       ref={containerRef}
       className="relative p-8 overflow-x-hidden min-h-[600px] bg-slate-50 flex flex-col items-center w-full"
     >
-      {/* SVG Layer for Connections */}
       <svg 
         className="absolute top-0 left-0 w-full h-full pointer-events-none z-0"
         aria-hidden="true"
@@ -90,10 +89,6 @@ const SkillTree: React.FC<SkillTreeProps> = ({ nodes, onNodeClick }) => {
           >
             <polygon points="0 0, 10 3.5, 0 7" fill="#cbd5e1" />
           </marker>
-          <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#6366f1" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="#6366f1" stopOpacity="0.5" />
-          </linearGradient>
         </defs>
         {connections.map((conn, i) => {
           const fromNode = nodes.find(n => n.id === conn.fromId);
@@ -124,7 +119,7 @@ const SkillTree: React.FC<SkillTreeProps> = ({ nodes, onNodeClick }) => {
           return (
             <div 
               key={node.id}
-              ref={(el) => (nodeRefs.current[node.id] = el)}
+              ref={(el) => { if (el) nodeRefs.current[node.id] = el; }}
               onClick={() => !isLocked && onNodeClick(node)}
               className={`
                 relative p-6 rounded-2xl border-2 transition-all cursor-pointer group

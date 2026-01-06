@@ -5,7 +5,8 @@ import OnboardingForm from './components/OnboardingForm';
 import SkillTree from './components/SkillTree';
 import UseCaseDetail from './components/UseCaseDetail';
 import Portfolio from './components/Portfolio';
-import { UserProfile, SkillNode, SkillStatus, Artifact } from './types';
+import AdminDashboard from './components/AdminDashboard';
+import { UserProfile, SkillNode, SkillStatus, Artifact, LearningTrack } from './types';
 import { SKILL_NODES, MOCK_USE_CASES } from './constants';
 import { calculateLearningPath, adjustGraphForPerformance } from './services/matchingEngine';
 
@@ -16,13 +17,16 @@ const App: React.FC = () => {
   const [nodes, setNodes] = useState<SkillNode[]>(SKILL_NODES);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
 
-  // Track adaptive metrics
   useEffect(() => {
     if (userProfile) {
-      const adjusted = adjustGraphForPerformance(SKILL_NODES, userProfile.masteryScore, userProfile.domainPreference);
-      setNodes(adjusted);
+      if (userProfile.isAdmin) {
+        setNodes(SKILL_NODES.map(n => ({...n, status: SkillStatus.UNLOCKED})));
+      } else {
+        const adjusted = adjustGraphForPerformance(SKILL_NODES, userProfile.masteryScore, userProfile.domainPreference);
+        setNodes(adjusted);
+      }
     }
-  }, [userProfile?.masteryScore, userProfile?.domainPreference]);
+  }, [userProfile?.masteryScore, userProfile?.domainPreference, userProfile?.isAdmin]);
 
   const handleOnboardingComplete = (profile: UserProfile) => {
     const { track, domainPreference, startingUseCaseId } = calculateLearningPath(profile);
@@ -31,11 +35,16 @@ const App: React.FC = () => {
       track, 
       domainPreference,
       verifiedSkills: [],
-      masteryScore: 70 // Initial starting score
+      masteryScore: 70 
     };
     setUserProfile(completeProfile);
     setActiveUseCaseId(startingUseCaseId);
-    setCurrentTab('dashboard');
+    
+    if (completeProfile.isAdmin) {
+      setCurrentTab('admin');
+    } else {
+      setCurrentTab('dashboard');
+    }
   };
 
   const handleNodeClick = (node: SkillNode) => {
@@ -50,18 +59,14 @@ const App: React.FC = () => {
     const uc = MOCK_USE_CASES.find(u => u.id === useCaseId);
     if (!uc || !userProfile) return;
 
-    // Adaptive Update: Change Mastery Score
     const newMastery = Math.min(100, Math.max(0, userProfile.masteryScore + difficultyAdjustment));
-    
-    // Update Profile
-    const updatedProfile = {
+    const updatedProfile: UserProfile = {
       ...userProfile,
       masteryScore: newMastery,
-      verifiedSkills: [...new Set([...userProfile.verifiedSkills, ...uc.requiredSkills])]
+      verifiedSkills: Array.from(new Set([...userProfile.verifiedSkills, ...uc.requiredSkills]))
     };
     setUserProfile(updatedProfile);
 
-    // Update Nodes Local state (Unlock dependents)
     const newNodes = nodes.map(node => {
       if (uc.requiredSkills.includes(node.id)) {
         return { ...node, status: SkillStatus.COMPLETED };
@@ -80,17 +85,19 @@ const App: React.FC = () => {
     });
     setNodes(finalNodes);
 
-    // Artifact Generation
+    // Added missing properties: userId, useCaseId, status
     const newArtifact: Artifact = {
       id: Math.random().toString(),
+      userId: userProfile.id,
+      useCaseId: useCaseId,
       title: uc.title,
       type: 'Pilot Artifact',
       date: new Date().toLocaleDateString('en-IN'),
       url: '#',
-      thumbnail: uc.finishedOutputPreviewUrl
+      thumbnail: uc.finishedOutputPreviewUrl,
+      status: 'verified'
     };
     setArtifacts([newArtifact, ...artifacts]);
-
     setCurrentTab('portfolio');
   };
 
@@ -99,7 +106,7 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-slate-50 flex flex-col items-center p-6">
         <header className="text-center mb-12">
            <h1 className="text-4xl font-black text-slate-900 heading mb-4 tracking-tighter">Build Your First AI Pilot <span className="text-indigo-600">in 45 Minutes.</span></h1>
-           <p className="text-slate-500 max-w-lg mx-auto font-medium">Precision learning for Supply Chain & Marketing leaders in India.</p>
+           <p className="text-slate-500 max-w-lg mx-auto font-medium text-lg italic">The v1 personal OS for India's Supply Chain & Marketing leaders.</p>
         </header>
         <OnboardingForm onComplete={handleOnboardingComplete} />
       </div>
@@ -114,6 +121,7 @@ const App: React.FC = () => {
         currentTab={currentTab} 
         setTab={setCurrentTab} 
         userRole={userProfile.role} 
+        isAdmin={userProfile.isAdmin}
       />
 
       <main className="transition-all duration-300">
@@ -126,7 +134,7 @@ const App: React.FC = () => {
                </div>
                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full border-4 border-emerald-100 border-t-emerald-600 flex items-center justify-center font-bold text-emerald-600 text-sm">
-                    {Math.round((userProfile.verifiedSkills.length / nodes.filter(n => n.status !== SkillStatus.HIDDEN).length) * 100)}%
+                    {Math.round((userProfile.verifiedSkills.length / Math.max(1, nodes.filter(n => n.status !== SkillStatus.HIDDEN).length)) * 100)}%
                   </div>
                   <div>
                     <p className="text-xs font-bold text-slate-400 uppercase">Track Completion</p>
@@ -148,6 +156,10 @@ const App: React.FC = () => {
 
         {currentTab === 'portfolio' && (
           <Portfolio profile={userProfile} artifacts={artifacts} />
+        )}
+
+        {currentTab === 'admin' && userProfile.isAdmin && (
+          <AdminDashboard />
         )}
       </main>
     </div>
