@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from './services/supabase'; // Import Supabase
-import { Session } from '@supabase/supabase-js'; // Import Session Type
-import Auth from './components/Auth'; // Import the new Auth component
+import { supabase } from './services/supabase';
+import { Session } from '@supabase/supabase-js';
 
+// --- Services & Components ---
+import { saveUserProfile, getUserProfile } from './services/userService'; //
+import Auth from './components/Auth';
 import CourseList from './components/CourseList';
 import Navigation from './components/Navigation';
 import OnboardingForm from './components/OnboardingForm';
@@ -10,41 +12,65 @@ import SkillTree from './components/SkillTree';
 import UseCaseDetail from './components/UseCaseDetail';
 import Portfolio from './components/Portfolio';
 import AdminDashboard from './components/AdminDashboard';
+
+// --- Types & Constants ---
 import { UserProfile, SkillNode, SkillStatus, Artifact } from './types';
 import { SKILL_NODES, MOCK_USE_CASES } from './constants';
 import { calculateLearningPath, adjustGraphForPerformance } from './services/matchingEngine';
 
 const App: React.FC = () => {
-  // --- NEW AUTH STATE ---
+  // --- AUTH STATE ---
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // --- EXISTING STATE ---
+  // --- APP STATE ---
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [activeUseCaseId, setActiveUseCaseId] = useState<string | null>(null);
   const [nodes, setNodes] = useState<SkillNode[]>(SKILL_NODES);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
 
-  // --- 1. CHECK LOGIN STATUS ON LOAD ---
+  // --- 1. AUTH & DATA LOADING EFFECT ---
   useEffect(() => {
-    // Get initial session
+    // Helper to load profile from DB
+    const loadUserData = async (currentSession: Session) => {
+      try {
+        const profile = await getUserProfile(currentSession.user.id);
+        if (profile) {
+          setUserProfile(profile); // Found profile -> Skip onboarding
+        }
+      } catch (error) {
+        console.error("Error loading profile:", error);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    // Initial Session Check
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setAuthLoading(false);
+      if (session) {
+        loadUserData(session);
+      } else {
+        setAuthLoading(false);
+      }
     });
 
-    // Listen for changes (Login/Logout)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Listen for Auth Changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session) {
+        loadUserData(session);
+      } else {
+        setUserProfile(null); // Clear profile on logout
+        setAuthLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- EXISTING EFFECTS ---
+  // --- 2. SKILL GRAPH ADJUSTMENT EFFECT ---
   useEffect(() => {
     if (userProfile) {
       if (userProfile.isAdmin) {
@@ -56,15 +82,25 @@ const App: React.FC = () => {
     }
   }, [userProfile?.masteryScore, userProfile?.domainPreference, userProfile?.isAdmin]);
 
-  const handleOnboardingComplete = (profile: UserProfile) => {
+  // --- HANDLERS ---
+
+  const handleOnboardingComplete = async (profile: UserProfile) => {
+    if (!session?.user) return;
+
     const { track, domainPreference, startingUseCaseId } = calculateLearningPath(profile);
+    
+    // Create complete profile with Auth ID
     const completeProfile: UserProfile = { 
       ...profile, 
+      id: session.user.id,
+      email: session.user.email || '',
       track, 
       domainPreference,
       verifiedSkills: [],
       masteryScore: 70 
     };
+
+    // 1. Update UI immediately
     setUserProfile(completeProfile);
     setActiveUseCaseId(startingUseCaseId);
     
@@ -72,6 +108,13 @@ const App: React.FC = () => {
       setCurrentTab('admin');
     } else {
       setCurrentTab('dashboard');
+    }
+
+    // 2. Save to Supabase (Background)
+    try {
+      await saveUserProfile(completeProfile);
+    } catch (err) {
+      console.error("Failed to save profile:", err);
     }
   };
 
@@ -94,10 +137,26 @@ const App: React.FC = () => {
       verifiedSkills: Array.from(new Set([...userProfile.verifiedSkills, ...uc.requiredSkills]))
     };
     setUserProfile(updatedProfile);
-    
-    // (Logic truncated for brevity - keeping your existing logic here)
-    // ... [Rest of your handleTaskComplete logic remains same] ...
-    
+
+    // Update Skill Tree Logic
+    const newNodes = nodes.map(node => {
+      if (uc.requiredSkills.includes(node.id)) {
+        return { ...node, status: SkillStatus.COMPLETED };
+      }
+      return node;
+    });
+
+    const finalNodes = newNodes.map(node => {
+      if (node.status === SkillStatus.LOCKED) {
+        const depsMet = node.dependencies.every(depId => 
+          newNodes.find(n => n.id === depId)?.status === SkillStatus.COMPLETED
+        );
+        if (depsMet) return { ...node, status: SkillStatus.UNLOCKED };
+      }
+      return node;
+    });
+    setNodes(finalNodes);
+
     const newArtifact: Artifact = {
       id: Math.random().toString(),
       userId: userProfile.id,
@@ -111,28 +170,31 @@ const App: React.FC = () => {
     };
     setArtifacts([newArtifact, ...artifacts]);
     setCurrentTab('portfolio');
+    
+    // Optional: Auto-save progress here if desired in future
+    // saveUserProfile(updatedProfile);
   };
 
-  // --- LOGOUT FUNCTION ---
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setUserProfile(null); // Reset local profile state
-    setNodes(SKILL_NODES); // Reset tree
+    setUserProfile(null);
+    setNodes(SKILL_NODES);
+    setSession(null);
   };
 
-  // --- RENDER GATES ---
+  // --- RENDERING ---
 
-  // 1. Loading Spinner
+  // 1. Loading
   if (authLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading AI Pilot Forge...</div>;
+    return <div className="min-h-screen flex items-center justify-center text-slate-500 font-medium">Loading AI Pilot Forge...</div>;
   }
 
-  // 2. Not Logged In -> Show Auth Screen
+  // 2. Auth Screen (Gatekeeper)
   if (!session) {
     return <Auth />;
   }
 
-  // 3. Logged In BUT No Profile -> Show Onboarding
+  // 3. Onboarding (Logged in, but new user)
   if (!userProfile) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center p-6">
@@ -148,13 +210,13 @@ const App: React.FC = () => {
     );
   }
 
-  // 4. Logged In AND Has Profile -> Show Main App
+  // 4. Main App (Logged in & Profile loaded)
   const activeUseCase = MOCK_USE_CASES.find(u => u.id === activeUseCaseId) || MOCK_USE_CASES[0];
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       <div className="bg-slate-900 text-white px-4 py-2 flex justify-between items-center text-xs">
-         <span>Logged in as: {session.user.email}</span>
+         <span>Logged in as: {session.user.email} {userProfile.isAdmin ? '(ADMIN)' : ''}</span>
          <button onClick={handleLogout} className="hover:text-red-300">Sign Out</button>
       </div>
 
@@ -180,7 +242,17 @@ const App: React.FC = () => {
                     View Course Catalog
                   </button>
                </div>
-               {/* ... Your Progress Widget ... */}
+
+               {/* Progress Widget (Restored) */}
+               <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full border-4 border-emerald-100 border-t-emerald-600 flex items-center justify-center font-bold text-emerald-600 text-sm">
+                    {Math.round((userProfile.verifiedSkills.length / Math.max(1, nodes.filter(n => n.status !== SkillStatus.HIDDEN).length)) * 100)}%
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-400 uppercase">Track Completion</p>
+                    <p className="text-sm font-bold text-slate-700">{userProfile.verifiedSkills.length} Skills Verified</p>
+                  </div>
+               </div>
             </div>
             <SkillTree nodes={nodes.filter(n => n.status !== SkillStatus.HIDDEN)} onNodeClick={handleNodeClick} />
           </div>
@@ -201,7 +273,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* ... Other Tabs (UseCase, Portfolio, Admin) ... */}
         {currentTab === 'usecase' && (
           <UseCaseDetail 
             useCase={activeUseCase} 
@@ -209,9 +280,11 @@ const App: React.FC = () => {
             onCompleteTask={handleTaskComplete}
           />
         )}
-         {currentTab === 'portfolio' && (
+
+        {currentTab === 'portfolio' && (
           <Portfolio profile={userProfile} artifacts={artifacts} />
         )}
+
         {currentTab === 'admin' && userProfile.isAdmin && (
           <AdminDashboard />
         )}
