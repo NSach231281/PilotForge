@@ -1,32 +1,85 @@
-
 import React, { useState } from 'react';
 import { SKILL_NODES, MOCK_USE_CASES } from '../constants';
-import { SkillStatus, LearningTrack, SkillNode, VerificationCriteria } from '../types';
+import { SkillNode } from '../types';
 import { generateAILearningContent } from '../services/geminiService';
+import { createCourse } from '../services/courseService'; // Import the DB Service
 
 const AdminDashboard: React.FC = () => {
+  // --- STATE ---
   const [activeAuditTab, setActiveAuditTab] = useState<'inventory' | 'datasets' | 'paths' | 'lab'>('inventory');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [labForm, setLabForm] = useState<Partial<SkillNode>>({
+  const [isSaving, setIsSaving] = useState(false); // New state for saving to DB
+  const [message, setMessage] = useState(''); // Feedback message
+
+  // Form State
+  const [labForm, setLabForm] = useState<{
+    label: string;
+    description: string;
+    difficulty: 'beginner' | 'intermediate' | 'advanced';
+    domain: string;
+  }>({
     label: '',
-    domain: 'ops',
-    difficulty: 'basic',
-    type: 'data',
-    dependencies: []
+    description: '',
+    difficulty: 'beginner',
+    domain: 'ops'
   });
 
+  // --- 1. AI GENERATOR (Your existing feature) ---
   const handleAiGenerate = async () => {
     if (!labForm.label) return alert("Enter a label first");
     setIsGenerating(true);
+    setMessage('');
     try {
-      const content = await generateAILearningContent(labForm.label, labForm.domain || 'ops');
-      console.log("AI Generated Production Content:", content);
-      alert("AI drafted the curriculum and verification criteria. Ready for JSON Export.");
+      // We ask Gemini to help us write the description
+      const content = await generateAILearningContent(labForm.label, labForm.domain);
+      console.log("AI Generated Content:", content);
+      
+      // Update the form with AI suggestions (assuming content returns a description string or object)
+      // For now, let's just use it to populate the description field if it's empty
+      setLabForm(prev => ({
+        ...prev,
+        description: typeof content === 'string' ? content : "AI Generated Curriculum available in logs."
+      }));
+
+      setMessage("✨ AI drafted the curriculum!");
+    } catch (error) {
+      console.error(error);
+      setMessage("❌ AI Generation failed.");
     } finally {
       setIsGenerating(false);
     }
   };
 
+  // --- 2. SAVE TO DB (The New Feature) ---
+  const handleCommitToGraph = async () => {
+    if (!labForm.label || !labForm.description) {
+      setMessage('❌ Please fill in Title and Description');
+      return;
+    }
+
+    setIsSaving(true);
+    setMessage('');
+
+    try {
+      await createCourse({
+        title: labForm.label,
+        description: labForm.description,
+        difficulty: labForm.difficulty,
+        content: { domain: labForm.domain, source: 'admin-dashboard' } // Storing metadata
+      });
+
+      setMessage('✅ Success! Course saved to Supabase.');
+      // Optional: Clear form
+      setLabForm(prev => ({ ...prev, label: '', description: '' }));
+    } catch (error) {
+      console.error(error);
+      setMessage('❌ Failed to save to Database.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // --- 3. EXPORT UTILITY (Your existing feature) ---
   const exportForProduction = () => {
     const data = {
       version: "1.0",
@@ -44,6 +97,7 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+      {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-900 heading">Production Control</h1>
@@ -71,18 +125,23 @@ const AdminDashboard: React.FC = () => {
         </div>
       </header>
 
+      {/* CONTENT LAB TAB */}
       {activeAuditTab === 'lab' ? (
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold heading">Author Skill Gate</h2>
+                <div>
+                   <h2 className="text-xl font-bold heading">Author Skill Gate</h2>
+                   <p className="text-slate-500 text-xs mt-1">Create live courses in Supabase</p>
+                </div>
                 <span className="text-[10px] font-black uppercase bg-amber-100 text-amber-700 px-2 py-1 rounded">V1 Draft Mode</span>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
+                {/* TITLE INPUT */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase text-slate-400">Node Label</label>
+                  <label className="text-xs font-bold uppercase text-slate-400">Node Label (Title)</label>
                   <input 
                     type="text" 
                     placeholder="e.g. Lead Scoring AI"
@@ -91,41 +150,69 @@ const AdminDashboard: React.FC = () => {
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-indigo-600 font-bold"
                   />
                 </div>
+
+                {/* DESCRIPTION INPUT (Added for DB) */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase text-slate-400">Difficulty Gate</label>
-                  <select 
-                    value={labForm.difficulty}
-                    onChange={e => setLabForm({...labForm, difficulty: e.target.value as any})}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold"
-                  >
-                    <option value="basic">Tier 1: Foundations</option>
-                    <option value="intermediate">Tier 2: Build Sprint</option>
-                    <option value="advanced">Tier 3: Deployment</option>
-                  </select>
+                  <label className="text-xs font-bold uppercase text-slate-400">Description</label>
+                  <textarea 
+                    placeholder="Course description..."
+                    value={labForm.description}
+                    onChange={e => setLabForm({...labForm, description: e.target.value})}
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-indigo-600 font-medium h-24"
+                  />
+                </div>
+
+                {/* DIFFICULTY SELECT */}
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase text-slate-400">Difficulty Gate</label>
+                    <select 
+                      value={labForm.difficulty}
+                      onChange={e => setLabForm({...labForm, difficulty: e.target.value as any})}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                    >
+                      <option value="beginner">Tier 1: Foundations</option>
+                      <option value="intermediate">Tier 2: Build Sprint</option>
+                      <option value="advanced">Tier 3: Deployment</option>
+                    </select>
+                   </div>
                 </div>
               </div>
 
+              {/* FEEDBACK MESSAGE */}
+              {message && (
+                 <div className={`p-3 rounded-lg text-sm font-bold ${message.includes('Success') || message.includes('drafted') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                   {message}
+                 </div>
+              )}
+
+              {/* ACTION BUTTONS */}
               <div className="flex gap-4">
                 <button 
                   onClick={handleAiGenerate}
-                  disabled={isGenerating}
-                  className="flex-1 bg-indigo-50 text-indigo-700 p-4 rounded-xl font-bold border-2 border-indigo-100 hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
+                  disabled={isGenerating || isSaving}
+                  className="flex-1 bg-indigo-50 text-indigo-700 p-4 rounded-xl font-bold border-2 border-indigo-100 hover:bg-indigo-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {isGenerating ? 'AI Architecting...' : '✨ Generate Verification Logic'}
+                  {isGenerating ? 'AI Architecting...' : '✨ Generate Details'}
                 </button>
-                <button className="flex-1 bg-slate-900 text-white p-4 rounded-xl font-bold hover:bg-black transition-all">
-                  Commit to Graph
+                <button 
+                  onClick={handleCommitToGraph}
+                  disabled={isSaving || isGenerating}
+                  className="flex-1 bg-slate-900 text-white p-4 rounded-xl font-bold hover:bg-black transition-all disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving to DB...' : 'Commit to Graph'}
                 </button>
               </div>
             </div>
 
+            {/* GEMINI PREVIEW SECTION */}
             <div className="bg-slate-900 p-8 rounded-[2rem] text-white">
                <h2 className="text-xl font-bold mb-6">Verification Protocol (Gemini-Evaluated)</h2>
                <div className="space-y-4">
                   <div className="p-4 bg-white/5 border border-white/10 rounded-2xl">
                     <div className="flex justify-between items-center mb-2">
-                       <p className="font-bold text-sm">Criterion 1: Schema Match</p>
-                       <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded uppercase font-black tracking-widest">Active</span>
+                        <p className="font-bold text-sm">Criterion 1: Schema Match</p>
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded uppercase font-black tracking-widest">Active</span>
                     </div>
                     <p className="text-xs text-slate-400 italic">"Ensure the uploaded CSV contains 'Probability_Score' and 'City_Tier' columns."</p>
                   </div>
@@ -134,22 +221,17 @@ const AdminDashboard: React.FC = () => {
             </div>
           </div>
 
+          {/* SIDEBAR WIDGETS */}
           <div className="space-y-6">
             <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
                <h3 className="font-bold mb-4">India Compliance Audit</h3>
                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                    <span className="text-xs font-medium text-slate-600">DPDP Act Privacy Shield Active</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                    <span className="text-xs font-medium text-slate-600">Explicit Consent for PII Redaction</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-slate-300"></div>
-                    <span className="text-xs font-medium text-slate-600 italic text-slate-400">External Auditor Sign-off Pending</span>
-                  </div>
+                  <li className="flex items-center gap-3 text-sm text-slate-600">
+                     <div className="w-2 h-2 rounded-full bg-emerald-500"></div> DPDP Act Privacy Shield Active
+                  </li>
+                  <li className="flex items-center gap-3 text-sm text-slate-600">
+                     <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Explicit Consent for PII Redaction
+                  </li>
                </div>
             </div>
 
@@ -164,7 +246,7 @@ const AdminDashboard: React.FC = () => {
           </div>
         </section>
       ) : (
-        /* Inventory / Datasets / Paths (Same as before but with slightly cleaner UI) */
+        /* PLACEHOLDER FOR OTHER TABS */
         <div className="bg-white rounded-[2rem] p-12 text-center border-2 border-dashed border-slate-200">
            <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Audit Console Active for Tab: {activeAuditTab}</p>
            <p className="text-slate-500 text-sm mt-2">Data syncing with V1 Local State.</p>
