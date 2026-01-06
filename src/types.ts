@@ -85,3 +85,12 @@ export interface Artifact {
   status: 'pending' | 'verified' | 'failed';
   feedback?: string;
 }
+
+export interface Course {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  // We use 'any' for content right now because it's a complex JSON object
+  content: any; 
+}
