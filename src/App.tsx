@@ -1,12 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
+import CourseList from './components/CourseList';
 import Navigation from './components/Navigation';
 import OnboardingForm from './components/OnboardingForm';
 import SkillTree from './components/SkillTree';
 import UseCaseDetail from './components/UseCaseDetail';
 import Portfolio from './components/Portfolio';
 import AdminDashboard from './components/AdminDashboard';
-import { UserProfile, SkillNode, SkillStatus, Artifact, LearningTrack } from './types';
+import { UserProfile, SkillNode, SkillStatus, Artifact } from './types';
 import { SKILL_NODES, MOCK_USE_CASES } from './constants';
 import { calculateLearningPath, adjustGraphForPerformance } from './services/matchingEngine';
 
@@ -85,7 +85,6 @@ const App: React.FC = () => {
     });
     setNodes(finalNodes);
 
-    // Added missing properties: userId, useCaseId, status
     const newArtifact: Artifact = {
       id: Math.random().toString(),
       userId: userProfile.id,
@@ -130,7 +129,15 @@ const App: React.FC = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6">
                <div>
                   <h2 className="text-2xl font-bold text-slate-900 heading">Your {userProfile.domainPreference.toUpperCase()} Learning Path</h2>
-                  <p className="text-slate-500 font-medium italic">Path adapted to your role and verified mastery: {userProfile.masteryScore}%</p>
+                  <p className="text-slate-500 font-medium italic mb-4">Path adapted to your role and verified mastery: {userProfile.masteryScore}%</p>
+                  
+                  {/* --- NEW BUTTON TO ACCESS COURSES --- */}
+                  <button 
+                    onClick={() => setCurrentTab('courses')}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+                  >
+                    View Course Catalog
+                  </button>
                </div>
                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full border-4 border-emerald-100 border-t-emerald-600 flex items-center justify-center font-bold text-emerald-600 text-sm">
@@ -143,6 +150,23 @@ const App: React.FC = () => {
                </div>
             </div>
             <SkillTree nodes={nodes.filter(n => n.status !== SkillStatus.HIDDEN)} onNodeClick={handleNodeClick} />
+          </div>
+        )}
+
+        {/* --- NEW COURSES TAB --- */}
+        {currentTab === 'courses' && (
+          <div className="max-w-7xl mx-auto py-8 px-4">
+            <div className="mb-6">
+              <button 
+                onClick={() => setCurrentTab('dashboard')} 
+                className="text-slate-500 hover:text-slate-900 text-sm mb-4 flex items-center gap-1 font-medium"
+              >
+                ← Back to Dashboard
+              </button>
+              <h2 className="text-2xl font-bold text-slate-900 heading">Learning Resources</h2>
+              <p className="text-slate-500">Live courses fetched from Supabase</p>
+            </div>
+            <CourseList />
           </div>
         )}
 
