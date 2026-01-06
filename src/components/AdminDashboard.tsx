@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { SKILL_NODES, MOCK_USE_CASES } from '../constants';
-import { SkillNode } from '../types';
 import { generateAILearningContent } from '../services/geminiService';
 import { createCourse } from '../services/courseService'; // Import the DB Service
 
@@ -17,6 +16,7 @@ const AdminDashboard: React.FC = () => {
     description: string;
     difficulty: 'beginner' | 'intermediate' | 'advanced';
     domain: string;
+    caseData?: any; // Store the full AI JSON here
   }>({
     label: '',
     description: '',
@@ -24,24 +24,25 @@ const AdminDashboard: React.FC = () => {
     domain: 'ops'
   });
 
-  // --- 1. AI GENERATOR (Your existing feature) ---
+  // --- 1. AI GENERATOR ---
   const handleAiGenerate = async () => {
     if (!labForm.label) return alert("Enter a label first");
     setIsGenerating(true);
     setMessage('');
     try {
-      // We ask Gemini to help us write the description
+      // We ask Gemini to help us write the full Case Study
       const content = await generateAILearningContent(labForm.label, labForm.domain);
       console.log("AI Generated Content:", content);
       
-      // Update the form with AI suggestions (assuming content returns a description string or object)
-      // For now, let's just use it to populate the description field if it's empty
+      // Update the form with AI suggestions
+      // We format the description for the UI, but store the full object in caseData
       setLabForm(prev => ({
         ...prev,
-        description: typeof content === 'string' ? content : "AI Generated Curriculum available in logs."
+        description: `CASE: ${content.caseTitle}\n\nCONTEXT: ${content.companyContext}\n\nSCENARIO: ${content.narrative}`,
+        caseData: content
       }));
 
-      setMessage("✨ AI drafted the curriculum!");
+      setMessage("✨ Success! AI drafted a Harvard-style Case Study.");
     } catch (error) {
       console.error(error);
       setMessage("❌ AI Generation failed.");
@@ -50,7 +51,7 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  // --- 2. SAVE TO DB (The New Feature) ---
+  // --- 2. SAVE TO DB ---
   const handleCommitToGraph = async () => {
     if (!labForm.label || !labForm.description) {
       setMessage('❌ Please fill in Title and Description');
@@ -62,15 +63,16 @@ const AdminDashboard: React.FC = () => {
 
     try {
       await createCourse({
-        title: labForm.label,
+        title: labForm.caseData?.caseTitle || labForm.label, // Use AI title if available
         description: labForm.description,
         difficulty: labForm.difficulty,
-        content: { domain: labForm.domain, source: 'admin-dashboard' } // Storing metadata
+        // Store the FULL rich JSON into the content column
+        content: labForm.caseData || { source: 'manual', text: labForm.description } 
       });
 
       setMessage('✅ Success! Course saved to Supabase.');
-      // Optional: Clear form
-      setLabForm(prev => ({ ...prev, label: '', description: '' }));
+      // Clear form
+      setLabForm(prev => ({ ...prev, label: '', description: '', caseData: null }));
     } catch (error) {
       console.error(error);
       setMessage('❌ Failed to save to Database.');
@@ -79,7 +81,7 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  // --- 3. EXPORT UTILITY (Your existing feature) ---
+  // --- 3. EXPORT UTILITY ---
   const exportForProduction = () => {
     const data = {
       version: "1.0",
@@ -174,6 +176,18 @@ const AdminDashboard: React.FC = () => {
                       <option value="beginner">Tier 1: Foundations</option>
                       <option value="intermediate">Tier 2: Build Sprint</option>
                       <option value="advanced">Tier 3: Deployment</option>
+                    </select>
+                   </div>
+                   <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase text-slate-400">Domain</label>
+                    <select 
+                      value={labForm.domain}
+                      onChange={e => setLabForm({...labForm, domain: e.target.value})}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                    >
+                      <option value="ops">Supply Chain / Ops</option>
+                      <option value="marketing">Marketing / Growth</option>
+                      <option value="hr">HR / People Analytics</option>
                     </select>
                    </div>
                 </div>
