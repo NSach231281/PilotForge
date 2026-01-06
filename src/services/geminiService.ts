@@ -9,7 +9,8 @@ const genAI = new GoogleGenerativeAI(API_KEY);
 export const getJobSpecificContext = async (role: string, domain: string, tool: string) => {
   try {
     if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // Switch to standard model
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: `Explain why learning ${tool} is critical for a ${role} in ${domain} in the context of the Indian market. Max 50 words.` }] }],
     });
@@ -52,11 +53,11 @@ export const generateAILearningContent = async (topic: string, domain: string) =
             columns: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "List of columns e.g. ['SKU', 'Lead_Time']" },
             messyFactors: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "List of data errors to fix e.g. ['Missing Zip Codes']" },
             
-            // --- FIX IS HERE ---
+            // Fix: Ask for strings to avoid schema errors
             previewRows: { 
               type: SchemaType.ARRAY, 
-              description: "3 realistic rows of dummy data matching the story context. IMPORTANT: Return each row as a stringified JSON object.",
-              items: { type: SchemaType.STRING } // Changed from OBJECT to STRING to fix 400 error
+              description: "3 realistic rows of dummy data matching the story context. Return each row as a valid JSON string.",
+              items: { type: SchemaType.STRING } 
             }
           },
           required: ["filename", "columns", "messyFactors", "previewRows"]
@@ -80,8 +81,9 @@ export const generateAILearningContent = async (topic: string, domain: string) =
       required: ["caseTitle", "protagonist", "companyContext", "narrative", "strategicQuestions", "datasetContext", "modules"]
     };
 
+    // SWITCHED MODEL HERE TO 'gemini-pro'
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
+      model: "gemini-pro",
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: caseStudySchema,
