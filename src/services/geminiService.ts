@@ -43,7 +43,7 @@ export const generateAILearningContent = async (topic: string, domain: string) =
           items: { type: SchemaType.STRING }
         },
 
-        // 3. THE DATA (Restored!)
+        // 3. THE DATA
         datasetContext: {
           type: SchemaType.OBJECT,
           description: "Definition of the csv file the student will analyze",
@@ -103,11 +103,16 @@ export const generateAILearningContent = async (topic: string, domain: string) =
     const result = await model.generateContent(prompt);
     return JSON.parse(result.response.text());
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Content Gen Error:", error);
+    
+    // --- UPDATED DEBUG LOGIC ---
+    // This captures the real error message from Google/Vercel
+    const errorMessage = error?.message || "Unknown Error";
+
     return { 
-      caseTitle: "Error Generating Case", 
-      narrative: "Please check API Key.", 
+      caseTitle: "Connection Error", 
+      narrative: `TECHNICAL ERROR DETAILS: ${errorMessage}`, // <--- This will show in your UI
       strategicQuestions: [], 
       modules: [],
       datasetContext: { filename: "error.csv", columns: [], messyFactors: [], previewRows: [] }
