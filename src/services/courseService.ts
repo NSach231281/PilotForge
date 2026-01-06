@@ -14,3 +14,33 @@ export const getCourses = async (): Promise<Course[]> => {
 
   return data || [];
 };
+// ... existing imports
+
+// New Function: Create a Course
+export const createCourse = async (courseData: {
+  title: string;
+  description: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  content: any;
+}) => {
+  const { data, error } = await supabase
+    .from('courses')
+    .insert([
+      {
+        title: courseData.title,
+        description: courseData.description,
+        difficulty: courseData.difficulty,
+        content: courseData.content,
+        // created_at is auto-handled by Supabase
+      }
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating course:', error);
+    throw error;
+  }
+  
+  return data;
+};
