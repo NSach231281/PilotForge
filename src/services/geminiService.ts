@@ -1,69 +1,116 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
-// 1. FIX: Use Vite's env variable syntax
-// The '|| ""' prevents TypeScript from crashing if the key is missing momentarily
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-
 const genAI = new GoogleGenerativeAI(API_KEY);
 
+/**
+ * HELPER: Keeps your tooltips working
+ */
 export const getJobSpecificContext = async (role: string, domain: string, tool: string) => {
   try {
-    // 2. SAFETY CHECK: Don't call API if key is missing
     if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
-
-    // 3. MODEL UPDATE: 'gemini-3' is not public yet. Using 'gemini-1.5-flash' (fast & cheap)
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
     const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: `Explain why learning ${tool} is critical for a ${role} in ${domain} in the context of the Indian market. Keep it punchy, outcome-focused, and mention one specific high-impact use case. Max 100 words.` }] }],
-      generationConfig: {
-        temperature: 0.7,
-      }
+      contents: [{ role: "user", parts: [{ text: `Explain why learning ${tool} is critical for a ${role} in ${domain} in the context of the Indian market. Max 50 words.` }] }],
     });
-    
     return result.response.text();
   } catch (error) {
-    console.error("Gemini Error:", error);
-    // Fallback text so the app doesn't crash
-    return `Mastering ${tool} allows a ${role} to automate core workflows and reduce manual errors by 40%, a key KPI in the Indian ${domain} sector.`;
+    return `Mastering ${tool} allows a ${role} to automate core workflows in the Indian ${domain} sector.`;
   }
 };
 
 /**
- * Generates a realistic dummy dataset schema and rows for a specific use case.
+ * MAIN ENGINE: Generates Case Study AND Dataset Schema
  */
-export const generateAILearningContent = async (nodeLabel: string, domain: string) => {
+export const generateAILearningContent = async (topic: string, domain: string) => {
   try {
     if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
+
+    const caseStudySchema = {
+      description: "A structured business case study with dataset definition",
+      type: SchemaType.OBJECT,
+      properties: {
+        // 1. THE STORY
+        caseTitle: { type: SchemaType.STRING, description: "Catchy title like 'The Diwali Stockout Crisis'" },
+        protagonist: { type: SchemaType.STRING, description: "Name and role (e.g., 'Anjali, Supply Chain Lead')" },
+        companyContext: { type: SchemaType.STRING, description: "Context of the Indian company" },
+        narrative: { type: SchemaType.STRING, description: "3-paragraph story setting the scene of the crisis." },
+        
+        // 2. THE STRATEGY
+        strategicQuestions: {
+          type: SchemaType.ARRAY,
+          description: "5 business questions the protagonist must answer",
+          items: { type: SchemaType.STRING }
+        },
+
+        // 3. THE DATA (Restored!)
+        datasetContext: {
+          type: SchemaType.OBJECT,
+          description: "Definition of the csv file the student will analyze",
+          properties: {
+            filename: { type: SchemaType.STRING, description: "e.g., 'bangalore_warehouse_v2.csv'" },
+            columns: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "List of columns e.g. ['SKU', 'Lead_Time']" },
+            messyFactors: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "List of data errors to fix e.g. ['Missing Zip Codes']" },
+            previewRows: { 
+              type: SchemaType.ARRAY, 
+              description: "3 realistic rows of dummy data matching the story context",
+              items: { type: SchemaType.OBJECT, properties: {} } // Allow any shape
+            }
+          },
+          required: ["filename", "columns", "messyFactors", "previewRows"]
+        },
+
+        // 4. THE LEARNING MODULES
+        modules: {
+          type: SchemaType.ARRAY,
+          description: "Technical learning modules",
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              title: { type: SchemaType.STRING },
+              description: { type: SchemaType.STRING },
+              technicalSkill: { type: SchemaType.STRING }
+            },
+            required: ["title", "description", "technicalSkill"]
+          }
+        }
+      },
+      required: ["caseTitle", "protagonist", "companyContext", "narrative", "strategicQuestions", "datasetContext", "modules"]
+    };
 
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: SchemaType.OBJECT,
-          properties: {
-            context: { type: SchemaType.STRING },
-            cookbookSteps: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-            datasetPreview: { 
-              type: SchemaType.ARRAY, 
-              items: { type: SchemaType.OBJECT, properties: {} } 
-            }
-          }
-        }
+        responseSchema: caseStudySchema,
       }
     });
 
-    const result = await model.generateContent(`Act as a senior curriculum designer for an Indian edtech startup. 
-    Create a highly realistic dummy dataset schema and 3 rows of data for a learning module titled "${nodeLabel}" in the ${domain} domain. 
-    The data must feel uniquely Indian (city names like Ludhiana, specific business terms like 'GST compliance' or 'Lorry Hire'). 
-    Return strictly JSON.`);
-    
+    const prompt = `
+      Act as a Professor at a top Indian Business School. 
+      Create a 'Harvard-Style' Case Study for: "${topic}" in domain "${domain}".
+      
+      CRITICAL CONSTRAINTS:
+      1. Context must be strictly INDIAN (use specific cities, festivals, business terms).
+      2. The story must involve a Crisis.
+      3. The solution must require DATA ANALYTICS.
+      4. GENERATE DATASET DETAILS: Create a schema for a "messy" CSV file that contains the clues to solve the case.
+         - The 'previewRows' must look like real data (include specific Indian states/currencies).
+      
+      Return JSON matching the schema.
+    `;
+
+    const result = await model.generateContent(prompt);
     return JSON.parse(result.response.text());
 
   } catch (error) {
     console.error("Content Gen Error:", error);
-    // Return empty structure to prevent UI crash
-    return { context: "Error loading content.", cookbookSteps: [], datasetPreview: [] };
+    return { 
+      caseTitle: "Error Generating Case", 
+      narrative: "Please check API Key.", 
+      strategicQuestions: [], 
+      modules: [],
+      datasetContext: { filename: "error.csv", columns: [], messyFactors: [], previewRows: [] }
+    };
   }
 };
