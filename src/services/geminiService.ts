@@ -51,10 +51,12 @@ export const generateAILearningContent = async (topic: string, domain: string) =
             filename: { type: SchemaType.STRING, description: "e.g., 'bangalore_warehouse_v2.csv'" },
             columns: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "List of columns e.g. ['SKU', 'Lead_Time']" },
             messyFactors: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "List of data errors to fix e.g. ['Missing Zip Codes']" },
+            
+            // --- FIX IS HERE ---
             previewRows: { 
               type: SchemaType.ARRAY, 
-              description: "3 realistic rows of dummy data matching the story context",
-              items: { type: SchemaType.OBJECT, properties: {} } // Allow any shape
+              description: "3 realistic rows of dummy data matching the story context. IMPORTANT: Return each row as a stringified JSON object.",
+              items: { type: SchemaType.STRING } // Changed from OBJECT to STRING to fix 400 error
             }
           },
           required: ["filename", "columns", "messyFactors", "previewRows"]
@@ -94,8 +96,8 @@ export const generateAILearningContent = async (topic: string, domain: string) =
       1. Context must be strictly INDIAN (use specific cities, festivals, business terms).
       2. The story must involve a Crisis.
       3. The solution must require DATA ANALYTICS.
-      4. GENERATE DATASET DETAILS: Create a schema for a "messy" CSV file that contains the clues to solve the case.
-         - The 'previewRows' must look like real data (include specific Indian states/currencies).
+      4. GENERATE DATASET DETAILS: Create a schema for a "messy" CSV file.
+         - For 'previewRows', return an array of STRINGS, where each string represents a row in JSON format (e.g. "{\"city\": \"Mumbai\", \"sales\": 400}").
       
       Return JSON matching the schema.
     `;
@@ -106,13 +108,11 @@ export const generateAILearningContent = async (topic: string, domain: string) =
   } catch (error: any) {
     console.error("Content Gen Error:", error);
     
-    // --- UPDATED DEBUG LOGIC ---
-    // This captures the real error message from Google/Vercel
     const errorMessage = error?.message || "Unknown Error";
 
     return { 
       caseTitle: "Connection Error", 
-      narrative: `TECHNICAL ERROR DETAILS: ${errorMessage}`, // <--- This will show in your UI
+      narrative: `TECHNICAL ERROR DETAILS: ${errorMessage}`,
       strategicQuestions: [], 
       modules: [],
       datasetContext: { filename: "error.csv", columns: [], messyFactors: [], previewRows: [] }
