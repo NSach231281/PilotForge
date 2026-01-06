@@ -3,9 +3,10 @@ import { supabase } from './services/supabase';
 import { Session } from '@supabase/supabase-js';
 
 // --- Services & Components ---
-import { saveUserProfile, getUserProfile } from './services/userService'; //
+import { saveUserProfile, getUserProfile } from './services/userService';
 import Auth from './components/Auth';
 import CourseList from './components/CourseList';
+import CourseDetail from './components/CourseDetail'; // <--- NEW IMPORT
 import Navigation from './components/Navigation';
 import OnboardingForm from './components/OnboardingForm';
 import SkillTree from './components/SkillTree';
@@ -26,6 +27,10 @@ const App: React.FC = () => {
   // --- APP STATE ---
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [currentTab, setCurrentTab] = useState('dashboard');
+  
+  // New State for Course Navigation
+  const [activeCourseId, setActiveCourseId] = useState<string | null>(null); // <--- NEW STATE
+
   const [activeUseCaseId, setActiveUseCaseId] = useState<string | null>(null);
   const [nodes, setNodes] = useState<SkillNode[]>(SKILL_NODES);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -170,9 +175,6 @@ const App: React.FC = () => {
     };
     setArtifacts([newArtifact, ...artifacts]);
     setCurrentTab('portfolio');
-    
-    // Optional: Auto-save progress here if desired in future
-    // saveUserProfile(updatedProfile);
   };
 
   const handleLogout = async () => {
@@ -243,7 +245,7 @@ const App: React.FC = () => {
                   </button>
                </div>
 
-               {/* Progress Widget (Restored) */}
+               {/* Progress Widget */}
                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full border-4 border-emerald-100 border-t-emerald-600 flex items-center justify-center font-bold text-emerald-600 text-sm">
                     {Math.round((userProfile.verifiedSkills.length / Math.max(1, nodes.filter(n => n.status !== SkillStatus.HIDDEN).length)) * 100)}%
@@ -258,18 +260,29 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {/* --- UPDATED COURSES TAB LOGIC --- */}
         {currentTab === 'courses' && (
           <div className="max-w-7xl mx-auto py-8 px-4">
-            <div className="mb-6">
-              <button 
-                onClick={() => setCurrentTab('dashboard')} 
-                className="text-slate-500 hover:text-slate-900 text-sm mb-4 flex items-center gap-1 font-medium"
-              >
-                ← Back to Dashboard
-              </button>
-              <h2 className="text-2xl font-bold text-slate-900 heading">Learning Resources</h2>
-              <CourseList />
-            </div>
+            {activeCourseId ? (
+              // SHOW DETAIL VIEW
+              <CourseDetail 
+                courseId={activeCourseId} 
+                onBack={() => setActiveCourseId(null)} 
+              />
+            ) : (
+              // SHOW LIST VIEW
+              <div className="mb-6">
+                <button 
+                  onClick={() => setCurrentTab('dashboard')} 
+                  className="text-slate-500 hover:text-slate-900 text-sm mb-4 flex items-center gap-1 font-medium"
+                >
+                  ← Back to Dashboard
+                </button>
+                <h2 className="text-2xl font-bold text-slate-900 heading">Learning Resources</h2>
+                <p className="text-slate-500 mb-8">Live courses fetched from Supabase</p>
+                <CourseList onSelectCourse={(id) => setActiveCourseId(id)} />
+              </div>
+            )}
           </div>
         )}
 
