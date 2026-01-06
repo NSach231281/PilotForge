@@ -14,7 +14,6 @@ export const getCourses = async (): Promise<Course[]> => {
 
   return data || [];
 };
-// ... existing imports
 
 // New Function: Create a Course
 export const createCourse = async (courseData: {
@@ -40,6 +39,21 @@ export const createCourse = async (courseData: {
   if (error) {
     console.error('Error creating course:', error);
     throw error;
+  }
+  
+  return data;
+};
+
+export const getCourseById = async (id: string) => {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching course:', error);
+    return null;
   }
   
   return data;
