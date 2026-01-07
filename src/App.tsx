@@ -13,6 +13,7 @@ import SkillTree from './components/SkillTree';
 import UseCaseDetail from './components/UseCaseDetail';
 import Portfolio from './components/Portfolio';
 import AdminDashboard from './components/AdminDashboard';
+import ContentLab from './components/ContentLab'; // Ensure this is imported if used directly (though it's in AdminDashboard now)
 
 // --- Types & Constants ---
 import { UserProfile, SkillNode, SkillStatus, Artifact } from './types';
