@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { generateAILearningContent } from '../services/geminiService';
 import { generateFullDataset, getRecommendedRowCount } from '../utils/syntheticDataEngine';
 import { publishCourseToGraph } from '../services/adminService';
-// REMOVED: import { useNavigate } from 'react-router-dom'; <--- Causing the error
 
 // Helper to parse uploaded CSV text into JSON
 const parseCSV = (text: string) => {
@@ -17,8 +16,6 @@ const parseCSV = (text: string) => {
 };
 
 const ContentLab: React.FC = () => {
-  // REMOVED: const navigate = useNavigate(); <--- Not needed for your App architecture
-  
   // Input State
   const [topic, setTopic] = useState('');
   const [selectedDomain, setSelectedDomain] = useState('HR / People Analytics');
@@ -100,7 +97,7 @@ const ContentLab: React.FC = () => {
     setIsSaving(false);
     if (courseId) {
       alert("Success! Case Study & Dataset published to Learning Graph.");
-      // FIX: Since we are not using a Router, we just reload to reset to Dashboard state
+      // Reload effectively resets the app state back to the Dashboard view
       window.location.reload(); 
     } else {
       alert("Error saving to database. Check console.");
@@ -126,7 +123,8 @@ const ContentLab: React.FC = () => {
             className="w-full p-3 rounded-xl border border-slate-200 font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500"
           >
             <option>HR / People Analytics</option>
-            <option>Supply Chain & Ops</option>
+            {/* UPDATED: Specific labeling for SwiftLogistics context */}
+            <option>Logistics & Operations</option> 
             <option>Marketing Analytics</option>
             <option>Finance & Risk</option>
           </select>
