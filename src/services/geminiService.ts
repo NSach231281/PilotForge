@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(API_KEY);
@@ -9,8 +9,10 @@ const genAI = new GoogleGenerativeAI(API_KEY);
 export const getJobSpecificContext = async (role: string, domain: string, tool: string) => {
   try {
     if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
-    // Switch to standard model
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    
+    // Use the lightweight Flash model for tooltips
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: `Explain why learning ${tool} is critical for a ${role} in ${domain} in the context of the Indian market. Max 50 words.` }] }],
     });
@@ -21,95 +23,62 @@ export const getJobSpecificContext = async (role: string, domain: string, tool: 
 };
 
 /**
- * MAIN ENGINE: Generates Case Study AND Dataset Schema
+ * MAIN ENGINE: Universal "Manual JSON" Mode
+ * Works by stripping markdown instead of relying on API Schema enforcement.
  */
 export const generateAILearningContent = async (topic: string, domain: string) => {
   try {
     if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
 
-    const caseStudySchema = {
-      description: "A structured business case study with dataset definition",
-      type: SchemaType.OBJECT,
-      properties: {
-        // 1. THE STORY
-        caseTitle: { type: SchemaType.STRING, description: "Catchy title like 'The Diwali Stockout Crisis'" },
-        protagonist: { type: SchemaType.STRING, description: "Name and role (e.g., 'Anjali, Supply Chain Lead')" },
-        companyContext: { type: SchemaType.STRING, description: "Context of the Indian company" },
-        narrative: { type: SchemaType.STRING, description: "3-paragraph story setting the scene of the crisis." },
-        
-        // 2. THE STRATEGY
-        strategicQuestions: {
-          type: SchemaType.ARRAY,
-          description: "5 business questions the protagonist must answer",
-          items: { type: SchemaType.STRING }
-        },
-
-        // 3. THE DATA
-        datasetContext: {
-          type: SchemaType.OBJECT,
-          description: "Definition of the csv file the student will analyze",
-          properties: {
-            filename: { type: SchemaType.STRING, description: "e.g., 'bangalore_warehouse_v2.csv'" },
-            columns: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "List of columns e.g. ['SKU', 'Lead_Time']" },
-            messyFactors: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "List of data errors to fix e.g. ['Missing Zip Codes']" },
-            
-            // Fix: Ask for strings to avoid schema errors
-            previewRows: { 
-              type: SchemaType.ARRAY, 
-              description: "3 realistic rows of dummy data matching the story context. Return each row as a valid JSON string.",
-              items: { type: SchemaType.STRING } 
-            }
-          },
-          required: ["filename", "columns", "messyFactors", "previewRows"]
-        },
-
-        // 4. THE LEARNING MODULES
-        modules: {
-          type: SchemaType.ARRAY,
-          description: "Technical learning modules",
-          items: {
-            type: SchemaType.OBJECT,
-            properties: {
-              title: { type: SchemaType.STRING },
-              description: { type: SchemaType.STRING },
-              technicalSkill: { type: SchemaType.STRING }
-            },
-            required: ["title", "description", "technicalSkill"]
-          }
-        }
-      },
-      required: ["caseTitle", "protagonist", "companyContext", "narrative", "strategicQuestions", "datasetContext", "modules"]
-    };
-
-    // SWITCHED MODEL HERE TO 'gemini-pro'
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-pro",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: caseStudySchema,
-      }
-    });
+    // We use 1.5-flash because it is smart enough to write JSON without strict enforcement
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `
       Act as a Professor at a top Indian Business School. 
       Create a 'Harvard-Style' Case Study for: "${topic}" in domain "${domain}".
       
-      CRITICAL CONSTRAINTS:
-      1. Context must be strictly INDIAN (use specific cities, festivals, business terms).
+      CRITICAL INSTRUCTIONS:
+      1. Context must be strictly INDIAN (use specific cities like Mumbai/Bangalore, currency INR, GST, etc.).
       2. The story must involve a Crisis.
       3. The solution must require DATA ANALYTICS.
-      4. GENERATE DATASET DETAILS: Create a schema for a "messy" CSV file.
-         - For 'previewRows', return an array of STRINGS, where each string represents a row in JSON format (e.g. "{\"city\": \"Mumbai\", \"sales\": 400}").
       
-      Return JSON matching the schema.
+      OUTPUT FORMAT:
+      Return ONLY a raw JSON object. Do not include markdown formatting (like \`\`\`json).
+      
+      The JSON must match this structure exactly:
+      {
+        "caseTitle": "Catchy Title",
+        "protagonist": "Name and Role",
+        "companyContext": "Context description",
+        "narrative": "3-paragraph story",
+        "strategicQuestions": ["Question 1", "Question 2", "Question 3", "Question 4", "Question 5"],
+        "datasetContext": {
+          "filename": "data.csv",
+          "columns": ["Col1", "Col2"],
+          "messyFactors": ["Error 1", "Error 2"],
+          "previewRows": [
+             "{\"col1\": \"val1\", \"col2\": \"val2\"}",
+             "{\"col1\": \"val1\", \"col2\": \"val2\"}",
+             "{\"col1\": \"val1\", \"col2\": \"val2\"}"
+          ]
+        },
+        "modules": [
+          { "title": "Module 1", "description": "Desc", "technicalSkill": "Skill" },
+          { "title": "Module 2", "description": "Desc", "technicalSkill": "Skill" }
+        ]
+      }
     `;
 
     const result = await model.generateContent(prompt);
-    return JSON.parse(result.response.text());
+    const text = result.response.text();
+
+    // CLEANUP: The AI might wrap the response in ```json ... ```. We strip that.
+    const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    return JSON.parse(cleanedText);
 
   } catch (error: any) {
     console.error("Content Gen Error:", error);
-    
     const errorMessage = error?.message || "Unknown Error";
 
     return { 
