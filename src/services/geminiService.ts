@@ -1,55 +1,82 @@
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 
 /**
- * UTILITY: The "Model Hunter"
- * Finds a working model so we stop guessing.
+ * UTILITY: Auto-Retry Wrapper
+ * If Google says "Overloaded" (503) or "Too Many Requests" (429),
+ * we wait a few seconds and try again automatically.
+ */
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delay = 1000): Promise<Response> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(url, options);
+      
+      // If success, return immediately
+      if (response.ok) return response;
+
+      // If it's NOT a traffic error (e.g., 404 Not Found, 401 Bad Key), fail immediately
+      if (response.status !== 503 && response.status !== 429) {
+        return response; 
+      }
+
+      // If we are here, it's a traffic error. Wait and retry.
+      console.warn(`⚠️ Google is busy (Attempt ${i + 1}/${retries}). Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      // Increase delay for next time (Exponential Backoff: 1s -> 2s -> 4s)
+      delay *= 2;
+
+    } catch (err) {
+      // Network errors (like WiFi disconnect) also trigger retries
+      if (i === retries - 1) throw err;
+    }
+  }
+  throw new Error("Max retries reached. Google is still overloaded.");
+}
+
+/**
+ * UTILITY: Model Hunter
+ * Finds the best available model for your key.
  */
 async function findWorkingModel(baseUrl: string): Promise<string> {
   try {
-    // 1. Ask Google what models we have access to
     const listUrl = `${baseUrl}/models?key=${API_KEY}`;
     const response = await fetch(listUrl);
     const data = await response.json();
 
-    // 2. Log the truth to Console (Check F12 if this fails!)
-    console.log("🔍 Available Models for this Key:", data);
+    if (!data.models) return "models/gemini-pro"; 
 
-    if (!data.models) return "models/gemini-pro"; // Fallback
-
-    // 3. Find the best model that supports 'generateContent'
-    // Priority: Flash (Fastest) -> Pro (Standard) -> Any Gemini
+    // Filter for models that support generating content
     const validModels = data.models.filter((m: any) => 
       m.supportedGenerationMethods?.includes("generateContent") &&
       m.name.includes("gemini")
     );
 
+    // Prefer Pro (Stable) -> Flash (Fast) -> Any
     const bestModel = 
-      validModels.find((m: any) => m.name.includes("flash")) ||
       validModels.find((m: any) => m.name.includes("pro")) ||
+      validModels.find((m: any) => m.name.includes("flash")) ||
       validModels[0];
 
     return bestModel ? bestModel.name : "models/gemini-pro";
 
   } catch (e) {
-    console.warn("⚠️ Model discovery failed, defaulting to gemini-pro");
     return "models/gemini-pro";
   }
 }
 
 /**
- * HELPER: Tooltips (Job Context)
+ * HELPER: Tooltips
  */
 export const getJobSpecificContext = async (role: string, domain: string, tool: string) => {
   try {
     if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
 
-    // Use v1beta because it supports the widest range of new models
     const baseUrl = "https://generativelanguage.googleapis.com/v1beta";
     const modelName = await findWorkingModel(baseUrl);
-    
     const url = `${baseUrl}/${modelName}:generateContent?key=${API_KEY}`;
     
-    const response = await fetch(url, {
+    // USE RETRY HERE
+    const response = await fetchWithRetry(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -72,14 +99,12 @@ export const generateAILearningContent = async (topic: string, domain: string) =
   try {
     if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
 
-    // 1. Find the right model dynamically
     const baseUrl = "https://generativelanguage.googleapis.com/v1beta";
     const modelName = await findWorkingModel(baseUrl);
     console.log("🚀 Using Model:", modelName);
 
     const url = `${baseUrl}/${modelName}:generateContent?key=${API_KEY}`;
 
-    // 2. The Prompt
     const prompt = `
       Act as a Professor at a top Indian Business School. 
       Create a 'Harvard-Style' Case Study for: "${topic}" in domain "${domain}".
@@ -116,8 +141,8 @@ export const generateAILearningContent = async (topic: string, domain: string) =
       }
     `;
 
-    // 3. The Call
-    const response = await fetch(url, {
+    // USE RETRY HERE
+    const response = await fetchWithRetry(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -144,10 +169,9 @@ export const generateAILearningContent = async (topic: string, domain: string) =
   } catch (error: any) {
     console.error("Content Gen Error:", error);
     
-    // Fallback data so the app doesn't crash while you debug
     return { 
       caseTitle: "Service Unreachable", 
-      narrative: `TECHNICAL ERROR: ${error?.message || "Check Console (F12) for model details"}`,
+      narrative: `TECHNICAL ERROR: ${error?.message || "Google is currently overloaded. Please wait 1 minute and try again."}`,
       strategicQuestions: [], 
       modules: [],
       datasetContext: { filename: "error.csv", columns: [], messyFactors: [], previewRows: [] }
