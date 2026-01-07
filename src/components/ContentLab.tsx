@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { generateAILearningContent } from '../services/geminiService';
 import { generateFullDataset, getRecommendedRowCount } from '../utils/syntheticDataEngine';
 import { publishCourseToGraph } from '../services/adminService';
-import { useNavigate } from 'react-router-dom';
+// REMOVED: import { useNavigate } from 'react-router-dom'; <--- Causing the error
 
 // Helper to parse uploaded CSV text into JSON
 const parseCSV = (text: string) => {
@@ -17,7 +17,7 @@ const parseCSV = (text: string) => {
 };
 
 const ContentLab: React.FC = () => {
-  const navigate = useNavigate();
+  // REMOVED: const navigate = useNavigate(); <--- Not needed for your App architecture
   
   // Input State
   const [topic, setTopic] = useState('');
@@ -100,7 +100,8 @@ const ContentLab: React.FC = () => {
     setIsSaving(false);
     if (courseId) {
       alert("Success! Case Study & Dataset published to Learning Graph.");
-      navigate('/'); // Redirect to dashboard
+      // FIX: Since we are not using a Router, we just reload to reset to Dashboard state
+      window.location.reload(); 
     } else {
       alert("Error saving to database. Check console.");
     }
