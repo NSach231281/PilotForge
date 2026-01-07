@@ -5,13 +5,14 @@ const genAI = new GoogleGenerativeAI(API_KEY);
 
 /**
  * HELPER: Keeps your tooltips working
+ * CHANGED: Switched to 'gemini-pro' to fix the 404 error
  */
 export const getJobSpecificContext = async (role: string, domain: string, tool: string) => {
   try {
     if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
     
-    // Use the lightweight Flash model for tooltips
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // FIX: Use standard model
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
     
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: `Explain why learning ${tool} is critical for a ${role} in ${domain} in the context of the Indian market. Max 50 words.` }] }],
@@ -30,8 +31,8 @@ export const generateAILearningContent = async (topic: string, domain: string) =
   try {
     if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
 
-    // We use 1.5-flash because it is smart enough to write JSON without strict enforcement
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // FIX: Use standard model (gemini-pro) which is universally supported
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     const prompt = `
       Act as a Professor at a top Indian Business School. 
