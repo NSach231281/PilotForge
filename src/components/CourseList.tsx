@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { getCourses } from '../services/courseService';
 import { Course } from '../types';
 
-// New Interface: Defines the 'onSelectCourse' prop so App.tsx can listen for clicks
 interface CourseListProps {
   onSelectCourse?: (courseId: string) => void;
 }
@@ -26,7 +25,6 @@ const CourseList: React.FC<CourseListProps> = ({ onSelectCourse }) => {
     fetchData();
   }, []);
 
-  // Loading State with Tailwind styling
   if (loading) return <div className="p-8 text-center text-slate-500 font-medium">Loading available courses...</div>;
 
   return (
@@ -34,8 +32,12 @@ const CourseList: React.FC<CourseListProps> = ({ onSelectCourse }) => {
       {courses.map((course) => (
         <div 
           key={course.id} 
-          // The Critical Link: When clicked, send ID to parent
-          onClick={() => onSelectCourse && onSelectCourse(course.id)}
+          onClick={() => {
+            // FIX: Ensure ID exists before calling parent
+            if (course.id && onSelectCourse) {
+              onSelectCourse(course.id);
+            }
+          }}
           className="bg-white border border-slate-200 p-6 rounded-2xl hover:shadow-lg transition-all cursor-pointer group relative overflow-hidden"
         >
           {/* Difficulty Badge */}
