@@ -1,17 +1,18 @@
-// NOTE: We do NOT import GoogleGenerativeAI anymore. 
-// We communicate directly with the API endpoint.
+// NOTE: Using Direct Fetch to v1 Stable API
+// This bypasses all library version issues and "beta" model restrictions.
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 
 /**
- * HELPER: Tooltips (Direct Fetch)
+ * HELPER: Tooltips
  */
 export const getJobSpecificContext = async (role: string, domain: string, tool: string) => {
   try {
     if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
 
-    // Direct Endpoint for Gemini 1.5 Flash
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+    // FIX 1: Use 'v1' (Stable) instead of 'v1beta'
+    // FIX 2: Use 'gemini-pro' (The standard model everyone has)
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${API_KEY}`;
     
     const response = await fetch(url, {
       method: "POST",
@@ -26,6 +27,12 @@ export const getJobSpecificContext = async (role: string, domain: string, tool: 
     });
 
     const data = await response.json();
+    
+    // Safety check in case of error
+    if (!data.candidates || data.candidates.length === 0) {
+        return `Mastering ${tool} allows a ${role} to automate core workflows in the Indian ${domain} sector.`;
+    }
+
     return data.candidates[0].content.parts[0].text;
     
   } catch (error) {
@@ -35,15 +42,15 @@ export const getJobSpecificContext = async (role: string, domain: string, tool: 
 };
 
 /**
- * MAIN ENGINE: Direct Fetch "Universal Mode"
+ * MAIN ENGINE: Generation
  */
 export const generateAILearningContent = async (topic: string, domain: string) => {
   try {
     if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
 
-    // Direct Endpoint for Gemini 1.5 Flash
-    // This URL is universal and does not depend on your NPM version
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+    // FIX 1: Use 'v1' (Stable)
+    // FIX 2: Use 'gemini-pro'
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${API_KEY}`;
 
     const prompt = `
       Act as a Professor at a top Indian Business School. 
@@ -97,6 +104,12 @@ export const generateAILearningContent = async (topic: string, domain: string) =
     }
 
     const data = await response.json();
+    
+    // Safety Check
+    if (!data.candidates || !data.candidates[0].content) {
+        throw new Error("AI returned empty response. Try again.");
+    }
+
     const text = data.candidates[0].content.parts[0].text;
 
     // CLEANUP: Strip markdown
