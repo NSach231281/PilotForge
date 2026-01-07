@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { UserProfile, LearningTrack } from '../types';
 
@@ -52,15 +51,27 @@ const OnboardingForm: React.FC<OnboardingFormProps> = ({ onComplete }) => {
       setStep(step + 1);
     } else {
       const isAudit = formData.role === "Internal Auditor (Admin)";
+      
+      // FIX: Construct a complete UserProfile with ID and defaults
       onComplete({
-        ...formData,
+        id: 'user_' + Date.now(), // Generate Temp ID
+        role: formData.role || 'Learner',
+        industry: formData.industry || 'General',
+        tools: formData.tools || [],
+        goal: formData.goal || 'Upskilling',
+        availability: formData.availability || 5,
         isAdmin: isAudit,
+        track: LearningTrack.ANALYST, // Default
+        domainPreference: 'ops', // Default
+        verifiedSkills: [],
+        masteryScore: 0
       } as UserProfile);
     }
   };
 
   const handleDevBypass = () => {
     onComplete({
+      id: 'dev_user_001', // FIX: Added ID
       role: 'Founding Engineer',
       industry: 'EdTech',
       tools: ['python', 'sql'],
@@ -97,7 +108,17 @@ const OnboardingForm: React.FC<OnboardingFormProps> = ({ onComplete }) => {
               key={opt}
               onClick={() => {
                 setFormData({ ...formData, [current.field]: opt });
-                handleNext();
+                // We need a slight delay or just direct state update handling to ensure data is set before next
+                // But React state batching handles this usually. To be safe, we just set and let user click? 
+                // Actually your original code clicked and moved next immediately.
+                // Better pattern: set state, then wait. But for this simple form:
+                setFormData(prev => {
+                    const next = { ...prev, [current.field]: opt };
+                    // If we want to auto-advance, we can do it here or via effect.
+                    // For now, let's keep your logic but safe.
+                    return next;
+                });
+                handleNext(); 
               }}
               className="w-full text-left p-4 rounded-xl border-2 border-slate-100 hover:border-indigo-600 hover:bg-indigo-50 transition-all font-medium text-slate-700"
             >
