@@ -1,25 +1,38 @@
-
+// Define the Learning Track Enum
 export enum LearningTrack {
-  MANAGER = 'MANAGER',
-  ANALYST = 'ANALYST'
+  ANALYST = 'Analyst',
+  ENGINEER = 'Engineer',
+  STRATEGIST = 'Strategist'
+}
+
+// Update UserProfile to include the missing fields (email, phone, etc.)
+export interface UserProfile {
+  id: string;
+  email?: string;             // Fixed: Added Optional Email
+  name?: string;              // Fixed: Added Optional Name
+  phone?: string;             // Fixed: Added Optional Phone
+  subscriptionActive?: boolean; // Fixed: Added Subscription Status
+  
+  role: string;
+  industry: string;
+  tools: string[];
+  goal: string;
+  availability: number;
+  isAdmin?: boolean;
+  
+  // Learning State
+  track: LearningTrack | string; 
+  domainPreference: 'ops' | 'marketing' | 'hr' | string;
+  verifiedSkills: string[];
+  masteryScore: number;
 }
 
 export enum SkillStatus {
-  LOCKED = 'LOCKED',
-  UNLOCKED = 'UNLOCKED',
-  COMPLETED = 'COMPLETED',
-  HIDDEN = 'HIDDEN'
-}
-
-export type MaterialType = 'video' | 'text' | 'quiz' | 'dataset_fix' | 'file_upload';
-
-export interface LearningMaterial {
-  id: string;
-  type: MaterialType;
-  title: string;
-  content: string; // URL, Markdown, or JSON
-  durationMinutes: number;
-  order: number;
+  LOCKED = 'locked',
+  UNLOCKED = 'unlocked',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  HIDDEN = 'hidden' 
 }
 
 export interface SkillNode {
@@ -27,50 +40,29 @@ export interface SkillNode {
   label: string;
   description: string;
   status: SkillStatus;
-  dependencies: string[];
-  type: 'data' | 'model' | 'deployment' | 'optimization' | 'remediation';
-  domain: 'ops' | 'mkt' | 'shared';
-  difficulty: 'basic' | 'intermediate' | 'advanced';
-  materials: LearningMaterial[];
-}
-
-export interface VerificationCriteria {
-  id: string;
-  type: 'column_check' | 'value_check' | 'logic_check';
-  target: string;
-  expectedValue?: any;
+  dependencies: string[]; 
+  category: 'foundation' | 'tool' | 'business' | 'advanced';
+  x: number; 
+  y: number;
 }
 
 export interface UseCase {
   id: string;
   title: string;
-  domain: string;
-  context: string;
-  finishedOutputPreviewUrl: string;
-  requiredSkills: string[];
-  datasetDescription: string;
-  dummyDataPreview: any[];
-  verificationLogic: VerificationCriteria[];
-  cookbook: {
-    steps: string[];
-    resources: { label: string; url: string; type: 'excel' | 'notebook' | 'prompt' | 'csv' }[];
-  };
+  description: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  estimatedHours: number;
+  requiredSkills: string[]; 
+  finishedOutputPreviewUrl?: string; 
 }
 
-export interface UserProfile {
-  id: string;
-  phone: string; // India-first: Login via Phone/WhatsApp
-  role: string;
-  industry: string;
-  tools: string[];
-  goal: string;
-  availability: number;
-  track: LearningTrack;
-  verifiedSkills: string[];
-  domainPreference: 'ops' | 'mkt';
-  masteryScore: number;
-  isAdmin: boolean;
-  subscriptionActive: boolean; // Monetization flag
+export interface Course {
+  id?: string;
+  title: string;
+  description: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  content: any; 
+  created_at?: string;
 }
 
 export interface Artifact {
@@ -78,19 +70,9 @@ export interface Artifact {
   userId: string;
   useCaseId: string;
   title: string;
-  type: string;
+  type: 'Pilot Artifact' | 'Certificate' | 'Code Bundle';
   date: string;
   url: string;
-  thumbnail: string;
-  status: 'pending' | 'verified' | 'failed';
-  feedback?: string;
-}
-
-export interface Course {
-  id: string;
-  title: string;
-  description: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  // We use 'any' for content right now because it's a complex JSON object
-  content: any; 
+  thumbnail?: string;
+  status: 'verified' | 'pending';
 }
