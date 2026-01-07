@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { UseCase, UserProfile } from '../types';
 import { getJobSpecificContext } from '../services/geminiService';
@@ -16,8 +15,11 @@ const UseCaseDetail: React.FC<UseCaseDetailProps> = ({ useCase, profile, onCompl
 
   useEffect(() => {
     const fetchContext = async () => {
-      const context = await getJobSpecificContext(profile.role, profile.industry, useCase.title);
-      setAiContext(context);
+      // Safe check to ensure we have valid strings before calling AI
+      if (profile.role && useCase.title) {
+        const context = await getJobSpecificContext(profile.role, profile.industry || 'General', useCase.title);
+        setAiContext(context);
+      }
     };
     fetchContext();
   }, [useCase, profile]);
@@ -51,6 +53,7 @@ const UseCaseDetail: React.FC<UseCaseDetailProps> = ({ useCase, profile, onCompl
 
       {activeUnit === 'learn' ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {/* LEFT COLUMN */}
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100">
                <h1 className="text-3xl font-bold text-slate-900 heading mb-4">{useCase.title}</h1>
@@ -67,25 +70,12 @@ const UseCaseDetail: React.FC<UseCaseDetailProps> = ({ useCase, profile, onCompl
                <div className="prose prose-slate max-w-none">
                  <h3 className="font-bold text-lg mb-2">Technical Context</h3>
                  <p className="text-slate-600 leading-relaxed italic">{aiContext || 'Personalizing for your current role...'}</p>
-               </div>
-            </div>
-
-            <div className="bg-indigo-900 rounded-[2rem] p-8 text-white">
-               <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                 <svg className="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                 Quick Check: Can you spot the error?
-               </h3>
-               <p className="text-indigo-200 text-sm mb-6">In the warehouse dataset below, identify the column that prevents accurate demand sensing.</p>
-               <div className="bg-white/10 p-4 rounded-xl font-mono text-xs">
-                 {JSON.stringify(useCase.dummyDataPreview[0], null, 2)}
-               </div>
-               <div className="grid grid-cols-2 gap-4 mt-6">
-                 <button className="p-4 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold border border-white/10 transition-all">Format mismatch in Lead Time</button>
-                 <button className="p-4 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold border border-white/10 transition-all">Missing Warehouse ID</button>
+                 <p className="text-slate-600 mt-4">{useCase.description}</p>
                </div>
             </div>
           </div>
           
+          {/* RIGHT COLUMN */}
           <div className="space-y-6">
              <div className="bg-slate-900 text-white p-8 rounded-[2rem] shadow-xl">
                 <h4 className="font-bold mb-4">India-Specific Challenge</h4>
@@ -97,6 +87,18 @@ const UseCaseDetail: React.FC<UseCaseDetailProps> = ({ useCase, profile, onCompl
                    <p className="text-xs">"Always normalize your city-tier data before running clusters. Metro vs Tier-3 buying patterns are divergent."</p>
                 </div>
              </div>
+             
+             <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100">
+                <h4 className="font-bold text-indigo-900 mb-2">Required Skills</h4>
+                <div className="flex flex-wrap gap-2">
+                  {useCase.requiredSkills.map(skill => (
+                    <span key={skill} className="px-3 py-1 bg-white text-indigo-600 text-xs font-bold rounded-full border border-indigo-100 shadow-sm">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+             </div>
+
              <button 
               onClick={() => setActiveUnit('build')}
               className="w-full bg-indigo-600 text-white p-6 rounded-[2rem] font-bold shadow-xl shadow-indigo-200 hover:scale-[1.02] active:scale-[0.98] transition-all"
@@ -106,63 +108,32 @@ const UseCaseDetail: React.FC<UseCaseDetailProps> = ({ useCase, profile, onCompl
           </div>
         </div>
       ) : (
+        /* BUILD TAB */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-right-4 duration-500">
            <div className="lg:col-span-2 space-y-8">
               <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100">
                  <h3 className="text-xl font-bold text-slate-900 mb-6">Cookbook: Build Steps</h3>
                  <div className="space-y-4">
-                    {useCase.cookbook.steps.map((step, idx) => (
-                      <div key={idx} className="flex gap-4 items-start bg-slate-50 p-5 rounded-2xl border border-slate-100 group">
-                        <span className="w-8 h-8 rounded-full bg-white shadow-sm border border-slate-200 text-slate-400 flex items-center justify-center font-bold text-xs shrink-0 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-all">{idx + 1}</span>
-                        <p className="text-slate-700 font-medium">{step}</p>
-                      </div>
-                    ))}
+                   {/* FIXED: Check if cookbook exists, then map safely */}
+                   {useCase.cookbook && useCase.cookbook.length > 0 ? (
+                     useCase.cookbook.map((step, idx) => (
+                       <div key={idx} className="flex gap-4 items-start bg-slate-50 p-5 rounded-2xl border border-slate-100 group">
+                         <span className="w-8 h-8 rounded-full bg-white shadow-sm border border-slate-200 text-slate-400 flex items-center justify-center font-bold text-xs shrink-0 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-all">
+                           {idx + 1}
+                         </span>
+                         <p className="text-slate-700 font-medium">{step}</p>
+                       </div>
+                     ))
+                   ) : (
+                     <div className="p-8 text-center bg-slate-50 rounded-2xl text-slate-400 italic">
+                       No step-by-step guide available for this case yet.
+                     </div>
+                   )}
                  </div>
-              </div>
-
-              <div className="bg-slate-900 rounded-[2rem] p-8 text-white">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold">Sandbox Dataset</h3>
-                  <button className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-xs font-bold transition-colors">Download .csv</button>
-                </div>
-                <div className="overflow-x-auto rounded-xl border border-white/10">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-white/5 text-slate-300">
-                      <tr>
-                        {Object.keys(useCase.dummyDataPreview[0]).map(k => (
-                          <th key={k} className="px-4 py-3 border-b border-white/10 uppercase tracking-widest">{k}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="text-slate-400 font-mono">
-                      {useCase.dummyDataPreview.map((row, i) => (
-                        <tr key={i} className="border-b border-white/5 hover:bg-white/5">
-                          {Object.values(row).map((v: any, j) => (
-                            <td key={j} className="px-4 py-3">{v}</td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
               </div>
            </div>
 
            <div className="space-y-6">
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                <h4 className="font-bold text-slate-900 mb-4">Starter Assets</h4>
-                <div className="space-y-3">
-                  {useCase.cookbook.resources.map((res, i) => (
-                    <a key={i} href={res.url} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-indigo-50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <span className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-[9px] font-black uppercase">{res.type}</span>
-                        <span className="text-sm font-semibold text-slate-700">{res.label}</span>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-
               <div className="bg-indigo-600 p-8 rounded-[2rem] text-white shadow-xl shadow-indigo-100 relative overflow-hidden">
                 <div className="relative z-10">
                   <h4 className="font-black text-xl mb-2">Ship Your Pilot</h4>
