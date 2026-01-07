@@ -1,27 +1,22 @@
-// Define the Learning Track Enum
 export enum LearningTrack {
   ANALYST = 'Analyst',
   ENGINEER = 'Engineer',
   STRATEGIST = 'Strategist'
 }
 
-// Update UserProfile to include the missing fields (email, phone, etc.)
 export interface UserProfile {
   id: string;
-  email?: string;             // Fixed: Added Optional Email
-  name?: string;              // Fixed: Added Optional Name
-  phone?: string;             // Fixed: Added Optional Phone
-  subscriptionActive?: boolean; // Fixed: Added Subscription Status
-  
+  email?: string;
+  name?: string;
+  phone?: string;
+  subscriptionActive?: boolean;
   role: string;
   industry: string;
   tools: string[];
   goal: string;
   availability: number;
   isAdmin?: boolean;
-  
-  // Learning State
-  track: LearningTrack | string; 
+  track: LearningTrack | string;
   domainPreference: 'ops' | 'marketing' | 'hr' | string;
   verifiedSkills: string[];
   masteryScore: number;
@@ -32,7 +27,7 @@ export enum SkillStatus {
   UNLOCKED = 'unlocked',
   IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
-  HIDDEN = 'hidden' 
+  HIDDEN = 'hidden'
 }
 
 export interface SkillNode {
@@ -40,10 +35,15 @@ export interface SkillNode {
   label: string;
   description: string;
   status: SkillStatus;
-  dependencies: string[]; 
-  category: 'foundation' | 'tool' | 'business' | 'advanced';
-  x: number; 
+  dependencies: string[];
+  // Fix: We allow both 'category' (new) and 'type' (old) to prevent constant errors
+  category?: 'foundation' | 'tool' | 'business' | 'advanced';
+  type?: string; 
+  x: number;
   y: number;
+  // Fix: Added missing fields from matchingEngine
+  domain?: string;
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
 }
 
 export interface UseCase {
@@ -52,8 +52,11 @@ export interface UseCase {
   description: string;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   estimatedHours: number;
-  requiredSkills: string[]; 
-  finishedOutputPreviewUrl?: string; 
+  requiredSkills: string[];
+  finishedOutputPreviewUrl?: string;
+  // Fix: Added missing fields
+  domain?: string;
+  cookbook?: string[]; 
 }
 
 export interface Course {
@@ -61,7 +64,7 @@ export interface Course {
   title: string;
   description: string;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
-  content: any; 
+  content: any;
   created_at?: string;
 }
 
