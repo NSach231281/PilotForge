@@ -1,38 +1,49 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// NOTE: We do NOT import GoogleGenerativeAI anymore. 
+// We communicate directly with the API endpoint.
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-const genAI = new GoogleGenerativeAI(API_KEY);
 
 /**
- * HELPER: Keeps your tooltips working
- * CHANGED: Switched to 'gemini-pro' to fix the 404 error
+ * HELPER: Tooltips (Direct Fetch)
  */
 export const getJobSpecificContext = async (role: string, domain: string, tool: string) => {
   try {
     if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
+
+    // Direct Endpoint for Gemini 1.5 Flash
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
     
-    // FIX: Use standard model
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: `Explain why learning ${tool} is critical for a ${role} in ${domain} in the context of the Indian market. Max 50 words.` }] }],
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `Explain why learning ${tool} is critical for a ${role} in ${domain} in the context of the Indian market. Max 50 words.`
+          }]
+        }]
+      })
     });
-    return result.response.text();
+
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
+    
   } catch (error) {
+    console.error("Tooltip Error:", error);
     return `Mastering ${tool} allows a ${role} to automate core workflows in the Indian ${domain} sector.`;
   }
 };
 
 /**
- * MAIN ENGINE: Universal "Manual JSON" Mode
- * Works by stripping markdown instead of relying on API Schema enforcement.
+ * MAIN ENGINE: Direct Fetch "Universal Mode"
  */
 export const generateAILearningContent = async (topic: string, domain: string) => {
   try {
     if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
 
-    // FIX: Use standard model (gemini-pro) which is universally supported
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    // Direct Endpoint for Gemini 1.5 Flash
+    // This URL is universal and does not depend on your NPM version
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
 
     const prompt = `
       Act as a Professor at a top Indian Business School. 
@@ -70,10 +81,25 @@ export const generateAILearningContent = async (topic: string, domain: string) =
       }
     `;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }]
+      })
+    });
 
-    // CLEANUP: The AI might wrap the response in ```json ... ```. We strip that.
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error?.message || "API Request Failed");
+    }
+
+    const data = await response.json();
+    const text = data.candidates[0].content.parts[0].text;
+
+    // CLEANUP: Strip markdown
     const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
     return JSON.parse(cleanedText);
