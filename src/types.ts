@@ -20,6 +20,9 @@ export interface UserProfile {
   domainPreference: 'ops' | 'marketing' | 'hr' | string;
   verifiedSkills: string[];
   masteryScore: number;
+
+  // v1 Journey (optional for backward compatibility)
+  programProgress?: ProgramProgress;
 }
 
 export enum SkillStatus {
@@ -78,4 +81,49 @@ export interface Artifact {
   url: string;
   thumbnail?: string;
   status: 'verified' | 'pending';
+}
+
+// ------------------------------
+// PilotForge v1: 9-week Journey
+// ------------------------------
+
+export interface ProgramWeek {
+  programId: string; // e.g., 'ops-9w-v1'
+  weekNo: number; // 0..9
+  title: string;
+  outcome: string;
+  deliverables: string[];
+  rubric: {
+    overallPassScore: number; // 0..100
+    criteria: Array<{ key: string; label: string; max: number }>;
+  };
+}
+
+export interface WeekSubmission {
+  submittedAt: string; // ISO
+  text: string;
+  attachments: string[]; // urls (v1)
+}
+
+export interface WeekReview {
+  score: number; // 0..100
+  feedback: string;
+  strengths: string[];
+  improvements: string[];
+  nextActions: string[];
+}
+
+export interface ProgramProgress {
+  programId: string; // e.g., 'ops-9w-v1'
+  currentWeek: number; // 0..9
+  startedAt: string; // ISO
+  updatedAt: string; // ISO
+  weeks: Record<
+    number,
+    {
+      status: 'locked' | 'unlocked' | 'submitted' | 'passed' | 'needs_work';
+      submission?: WeekSubmission;
+      review?: WeekReview;
+    }
+  >;
 }
