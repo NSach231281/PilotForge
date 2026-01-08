@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient";
+import { supabase } from "./supabase";
 
 export type ContentType = "video" | "lesson" | "case_blueprint" | "case_full" | "template";
 
