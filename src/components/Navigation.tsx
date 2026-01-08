@@ -11,6 +11,7 @@ interface NavigationProps {
 const Navigation: React.FC<NavigationProps> = ({ currentTab, setTab, userRole, isAdmin }) => {
   const tabs = [
     { id: 'dashboard', label: 'My Skill Tree' },
+    { id: 'journey', label: '9-Week Journey' },
     { id: 'usecase', label: 'Current Sprint' },
     { id: 'portfolio', label: 'Public Portfolio' },
   ];
