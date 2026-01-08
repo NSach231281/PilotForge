@@ -12,6 +12,7 @@ import OnboardingForm from './components/OnboardingForm';
 import SkillTree from './components/SkillTree';
 import UseCaseDetail from './components/UseCaseDetail';
 import Portfolio from './components/Portfolio';
+import Journey from './components/Journey';
 import AdminDashboard from './components/AdminDashboard';
 import ContentLab from './components/ContentLab'; // Ensure this is imported if used directly (though it's in AdminDashboard now)
 
@@ -231,6 +232,13 @@ const App: React.FC = () => {
       />
 
       <main className="transition-all duration-300">
+        {currentTab === 'journey' && (
+          <Journey
+            profile={userProfile}
+            onProfileUpdate={(p) => setUserProfile(p)}
+          />
+        )}
+
         {currentTab === 'dashboard' && (
           <div className="max-w-7xl mx-auto py-8 px-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6">
