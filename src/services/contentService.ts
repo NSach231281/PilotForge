@@ -1,155 +1,106 @@
-create extension if not exists "pgcrypto";
+import { supabase } from "./supabaseClient";
 
--- =========================
--- TABLE: content_items
--- =========================
-create table if not exists public.content_items (
-  id uuid primary key default gen_random_uuid(),
+export type ContentType = "video" | "lesson" | "case_blueprint" | "case_full" | "template";
 
-  type text not null check (type in ('video','lesson','case_blueprint','case_full','template')),
-  domain text not null default 'ops',
-  difficulty text not null default 'intermediate' check (difficulty in ('beginner','intermediate','advanced')),
+export interface ContentItem {
+  id: string;
+  type: ContentType;
+  domain: string;
+  difficulty: "beginner" | "intermediate" | "advanced";
+  title: string;
+  summary?: string | null;
+  content_json: any;
+  external_url?: string | null;
+  storage_path?: string | null;
+  tags: string[];
+  status: "draft" | "published";
+  created_at: string;
+  updated_at?: string;
+}
 
-  title text not null,
-  summary text,
-  content_json jsonb not null default '{}'::jsonb,
+export interface WeekContentMapRow {
+  id: string;
+  program_id: string;
+  week_no: number;
+  content_item_id: string;
+  order_index: number;
+  required: boolean;
+}
 
-  external_url text,
-  storage_path text,
+export async function listWeekContent(programId: string, weekNo: number): Promise<ContentItem[]> {
+  // 1) get mapping rows
+  const { data: mapRows, error: mapErr } = await supabase
+    .from("program_week_content_map")
+    .select("id, program_id, week_no, content_item_id, order_index, required")
+    .eq("program_id", programId)
+    .eq("week_no", weekNo)
+    .order("order_index", { ascending: true });
 
-  tags text[] not null default '{}'::text[],
+  if (mapErr) throw mapErr;
 
-  status text not null default 'draft' check (status in ('draft','published')),
+  const ids = (mapRows as WeekContentMapRow[] | null)?.map((r) => r.content_item_id) || [];
+  if (!ids.length) return [];
 
-  created_by uuid null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
+  // 2) fetch content items
+  const { data: items, error: itemsErr } = await supabase
+    .from("content_items")
+    .select("id, type, domain, difficulty, title, summary, content_json, external_url, storage_path, tags, status, created_at, updated_at")
+    .in("id", ids);
 
-create index if not exists idx_content_items_type on public.content_items(type);
-create index if not exists idx_content_items_domain on public.content_items(domain);
-create index if not exists idx_content_items_status on public.content_items(status);
-create index if not exists idx_content_items_tags_gin on public.content_items using gin(tags);
+  if (itemsErr) throw itemsErr;
 
--- updated_at trigger function (create if not exists isn't supported for functions reliably, so we "replace")
-create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
+  const itemMap = new Map<string, ContentItem>((items || []).map((x: any) => [x.id, x as ContentItem]));
 
--- Create trigger only if it doesn't exist
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_trigger
-    where tgname = 'trg_content_items_updated_at'
-  ) then
-    create trigger trg_content_items_updated_at
-    before update on public.content_items
-    for each row execute function public.set_updated_at();
-  end if;
-end;
-$$;
+  // 3) return in map order
+  return (mapRows || [])
+    .map((r: any) => itemMap.get(r.content_item_id))
+    .filter(Boolean) as ContentItem[];
+}
 
--- =========================
--- TABLE: datasets
--- =========================
-create table if not exists public.datasets (
-  id uuid primary key default gen_random_uuid(),
-  content_item_id uuid not null references public.content_items(id) on delete cascade,
+export async function saveContentItem(payload: Partial<ContentItem>): Promise<ContentItem> {
+  const { data, error } = await supabase.from("content_items").insert(payload).select("*").single();
+  if (error) throw error;
+  return data as ContentItem;
+}
 
-  format text not null default 'json' check (format in ('json','csv')),
-  dataset_json jsonb not null default '[]'::jsonb,
-  schema_json jsonb not null default '{}'::jsonb,
+export async function mapContentToWeek(params: {
+  programId: string;
+  weekNo: number;
+  contentItemId: string;
+  orderIndex?: number;
+  required?: boolean;
+}) {
+  const row = {
+    program_id: params.programId,
+    week_no: params.weekNo,
+    content_item_id: params.contentItemId,
+    order_index: params.orderIndex ?? 0,
+    required: params.required ?? true,
+  };
 
-  created_at timestamptz not null default now()
-);
+  const { data, error } = await supabase.from("program_week_content_map").insert(row).select("*").single();
+  if (error) throw error;
+  return data;
+}
 
-create index if not exists idx_datasets_content_item_id on public.datasets(content_item_id);
+export async function saveDatasetForContentItem(contentItemId: string, datasetJson: any, schemaJson: any) {
+  const { data, error } = await supabase
+    .from("datasets")
+    .insert({
+      content_item_id: contentItemId,
+      format: "json",
+      dataset_json: datasetJson,
+      schema_json: schemaJson,
+    })
+    .select("*")
+    .single();
 
--- =========================
--- TABLE: program_week_content_map
--- =========================
-create table if not exists public.program_week_content_map (
-  id uuid primary key default gen_random_uuid(),
+  if (error) throw error;
+  return data;
+}
 
-  program_id text not null,
-  week_no int not null check (week_no >= 0 and week_no <= 9),
-
-  content_item_id uuid not null references public.content_items(id) on delete cascade,
-
-  order_index int not null default 0,
-  required boolean not null default true,
-
-  created_at timestamptz not null default now()
-);
-
-create index if not exists idx_week_map_program_week on public.program_week_content_map(program_id, week_no);
-create index if not exists idx_week_map_content_item on public.program_week_content_map(content_item_id);
-
--- =========================
--- RLS (Permissive for build speed)
--- =========================
-alter table public.content_items enable row level security;
-alter table public.datasets enable row level security;
-alter table public.program_week_content_map enable row level security;
-
--- Policies: create only if missing
-do $$
-begin
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='content_items' and policyname='content_items_read_all_build') then
-    create policy "content_items_read_all_build"
-    on public.content_items
-    for select
-    to authenticated
-    using (true);
-  end if;
-
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='content_items' and policyname='content_items_write_all_build') then
-    create policy "content_items_write_all_build"
-    on public.content_items
-    for all
-    to authenticated
-    using (true)
-    with check (true);
-  end if;
-
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='datasets' and policyname='datasets_read_all_build') then
-    create policy "datasets_read_all_build"
-    on public.datasets
-    for select
-    to authenticated
-    using (true);
-  end if;
-
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='datasets' and policyname='datasets_write_all_build') then
-    create policy "datasets_write_all_build"
-    on public.datasets
-    for all
-    to authenticated
-    using (true)
-    with check (true);
-  end if;
-
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='program_week_content_map' and policyname='week_map_read_all_build') then
-    create policy "week_map_read_all_build"
-    on public.program_week_content_map
-    for select
-    to authenticated
-    using (true);
-  end if;
-
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='program_week_content_map' and policyname='week_map_write_all_build') then
-    create policy "week_map_write_all_build"
-    on public.program_week_content_map
-    for all
-    to authenticated
-    using (true)
-    with check (true);
-  end if;
-end;
-$$;
+export async function getDatasetByContentItem(contentItemId: string) {
+  const { data, error } = await supabase.from("datasets").select("*").eq("content_item_id", contentItemId).single();
+  if (error) return null;
+  return data;
+}
