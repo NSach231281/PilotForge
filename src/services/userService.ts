@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { UserProfile, LearningTrack } from '../types';
+import { UserProfile, LearningTrack, ProgramProgress } from '../types';
 
 // 1. SAVE: Updates the user's profile in the database
 export const saveUserProfile = async (profile: UserProfile) => {
@@ -20,7 +20,10 @@ export const saveUserProfile = async (profile: UserProfile) => {
         industry: profile.industry,
         tools: profile.tools,
         goal: profile.goal,
-        availability: profile.availability
+        availability: profile.availability,
+
+        // PilotForge Journey Progress (v1)
+        programProgress: (profile as any).programProgress || null
       }
     });
 
@@ -58,6 +61,9 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
     masteryScore: data.profile_data?.masteryScore || 0,
     domainPreference: data.profile_data?.domainPreference || 'ops',
     track: data.profile_data?.track || LearningTrack.ANALYST,
-    verifiedSkills: data.profile_data?.verifiedSkills || []
+    verifiedSkills: data.profile_data?.verifiedSkills || [],
+
+    // PilotForge Journey Progress (v1)
+    ...(data.profile_data?.programProgress ? { programProgress: data.profile_data.programProgress as ProgramProgress } : {})
   };
 };
