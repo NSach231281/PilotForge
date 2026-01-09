@@ -1,18 +1,13 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
+const MODEL = import.meta.env.VITE_GEMINI_MODEL || "gemini-1.5-flash";
 
-// Recommended default model for grading: fast + cheap + good enough
-const DEFAULT_MODEL = import.meta.env.VITE_GEMINI_MODEL || "gemini-1.5-flash";
-
-if (!API_KEY) {
-  // Don't crash build, but make it obvious at runtime
-  console.warn(
-    "[PilotForge] VITE_GEMINI_API_KEY is missing. AI grading will fail until it is set in Vercel env vars."
-  );
-}
-
-const genAI = new GoogleGenerativeAI(API_KEY);
+// Force stable API version (v1) instead of default v1beta
+const ai = new GoogleGenAI({
+  apiKey: API_KEY,
+  httpOptions: { apiVersion: "v1" },
+});
 
 export interface GradingResult {
   score: number;
@@ -22,48 +17,33 @@ export interface GradingResult {
 }
 
 export interface JourneyReview {
-  score: number; // 0-100
-  feedback: string; // 2-4 sentences
+  score: number;
+  feedback: string;
   strengths: string[];
   improvements: string[];
   nextActions: string[];
   pass: boolean;
 }
 
-// -----------------------------
-// Helpers
-// -----------------------------
-function ensureApiKey() {
+// ---------- helpers ----------
+function ensureKey() {
   if (!API_KEY) {
-    throw new Error(
-      "Gemini API key missing. Set VITE_GEMINI_API_KEY in Vercel Environment Variables."
-    );
+    throw new Error("Missing VITE_GEMINI_API_KEY. Set it in Vercel env vars.");
   }
 }
 
-function extractJson(text: string): any {
-  // 1) Remove markdown fences if any
+function extractJson(text: string) {
   const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
 
-  // 2) Try direct parse
+  // direct parse
   try {
     return JSON.parse(cleaned);
-  } catch (_) {
-    // 3) Try extracting JSON object substring
-    const firstBrace = cleaned.indexOf("{");
-    const lastBrace = cleaned.lastIndexOf("}");
-    if (firstBrace >= 0 && lastBrace > firstBrace) {
-      const maybeJson = cleaned.slice(firstBrace, lastBrace + 1);
-      return JSON.parse(maybeJson);
-    }
-    // 4) Try extracting JSON array substring (rare)
-    const firstBracket = cleaned.indexOf("[");
-    const lastBracket = cleaned.lastIndexOf("]");
-    if (firstBracket >= 0 && lastBracket > firstBracket) {
-      const maybeJson = cleaned.slice(firstBracket, lastBracket + 1);
-      return JSON.parse(maybeJson);
-    }
-    throw new Error("AI returned non-JSON output. Raw response: " + cleaned.slice(0, 200));
+  } catch {
+    // try substring object
+    const a = cleaned.indexOf("{");
+    const b = cleaned.lastIndexOf("}");
+    if (a >= 0 && b > a) return JSON.parse(cleaned.slice(a, b + 1));
+    throw new Error("Gemini returned non-JSON output: " + cleaned.slice(0, 200));
   }
 }
 
@@ -73,17 +53,13 @@ function clampScore(x: any): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-// -----------------------------
-// Case submission grading
-// -----------------------------
+// ---------- Case grading ----------
 export const evaluateSubmission = async (
   studentSubmission: string,
   caseContext: any
 ): Promise<GradingResult> => {
   try {
-    ensureApiKey();
-
-    const model = genAI.getGenerativeModel({ model: DEFAULT_MODEL });
+    ensureKey();
 
     const prompt = `
 You are a strict Professor evaluating a Case Study submission.
@@ -91,7 +67,7 @@ You are a strict Professor evaluating a Case Study submission.
 CASE CONTEXT:
 Title: ${caseContext.title}
 Scenario: ${caseContext.description}
-Strategic Questions to Answer: ${JSON.stringify(caseContext.content?.strategicQuestions || [])}
+Strategic Questions: ${JSON.stringify(caseContext.content?.strategicQuestions || [])}
 
 STUDENT SUBMISSION:
 """
@@ -99,24 +75,25 @@ ${studentSubmission}
 """
 
 TASK:
-Grade this submission on a scale of 0-100 based on:
-1. Analytical Depth (Did they use data?)
-2. Strategic Alignment (Does it solve the business crisis?)
-3. Clarity.
+Grade 0-100 based on Analytical Depth, Strategic Alignment, and Clarity.
 
-OUTPUT FORMAT:
-Return ONLY raw JSON (no markdown, no extra keys):
+OUTPUT:
+Return ONLY raw JSON:
 {
   "score": 85,
   "feedback": "2-sentence summary.",
-  "strengths": ["Point 1", "Point 2"],
-  "improvements": ["Missed Point 1", "Missed Point 2"]
+  "strengths": ["..."],
+  "improvements": ["..."]
 }
 `.trim();
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const resp = await ai.models.generateContent({
+      model: MODEL,
+      contents: prompt,
+    });
 
+    // SDK returns a helper .text in many examples; safest: coerce to string
+    const text = (resp as any).text ?? JSON.stringify(resp);
     const parsed = extractJson(text);
 
     return {
@@ -125,22 +102,18 @@ Return ONLY raw JSON (no markdown, no extra keys):
       strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
       improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
     };
-  } catch (error: any) {
-    console.error("Grading failed:", error);
+  } catch (e: any) {
+    console.error("Grading failed:", e);
     return {
       score: 0,
-      feedback:
-        error?.message ||
-        "Error grading submission. Please try again. (Admin: check Gemini model + API key.)",
+      feedback: e?.message || "Error grading submission.",
       strengths: [],
       improvements: [],
     };
   }
 };
 
-// -----------------------------
-// Journey grading (Week-by-week)
-// -----------------------------
+// ---------- Journey grading ----------
 export const evaluateJourneyWeek = async (
   submissionText: string,
   weekContext: {
@@ -152,47 +125,41 @@ export const evaluateJourneyWeek = async (
   }
 ): Promise<JourneyReview> => {
   try {
-    ensureApiKey();
-
-    const model = genAI.getGenerativeModel({ model: DEFAULT_MODEL });
+    ensureKey();
 
     const prompt = `
 You are a strict but fair reviewer for an outcome-based AI apprenticeship.
 
-WEEK CONTEXT:
-Week: ${weekContext.weekNo}
-Title: ${weekContext.title}
+WEEK:
+${weekContext.weekNo} — ${weekContext.title}
 Outcome: ${weekContext.outcome || ""}
-Expected Deliverables: ${JSON.stringify(weekContext.deliverables)}
+Deliverables: ${JSON.stringify(weekContext.deliverables)}
 
-RUBRIC (use this to score):
+Rubric:
 ${JSON.stringify(weekContext.rubric)}
 
-SUBMISSION:
+Submission:
 """
 ${submissionText}
 """
 
-TASK:
-1) Grade the submission on 0-100 (integer).
-2) Provide strengths, improvements, and exactly 5 concrete next actions.
-3) Mark pass=true only if it meets the week's bar.
-
-OUTPUT FORMAT:
-Return ONLY raw JSON (no markdown, no commentary):
+Return ONLY raw JSON:
 {
   "score": 82,
   "feedback": "2-4 sentences.",
   "strengths": ["..."],
   "improvements": ["..."],
-  "nextActions": ["...","...","...","...","..."],
+  "nextActions": ["...", "...", "...", "...", "..."],
   "pass": true
 }
 `.trim();
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const resp = await ai.models.generateContent({
+      model: MODEL,
+      contents: prompt,
+    });
 
+    const text = (resp as any).text ?? JSON.stringify(resp);
     const parsed = extractJson(text);
 
     return {
@@ -203,14 +170,13 @@ Return ONLY raw JSON (no markdown, no commentary):
       nextActions: Array.isArray(parsed.nextActions) ? parsed.nextActions.slice(0, 5) : [],
       pass: !!parsed.pass,
     };
-  } catch (error: any) {
-    console.error("Journey grading failed:", error);
-
+  } catch (e: any) {
+    console.error("Journey grading failed:", e);
     return {
       score: 0,
       feedback:
-        error?.message ||
-        "AI grading failed. Admin: verify VITE_GEMINI_API_KEY and VITE_GEMINI_MODEL (recommended gemini-1.5-flash).",
+        e?.message ||
+        "AI grading failed. Admin: verify model access + API version (use v1).",
       strengths: [],
       improvements: [],
       nextActions: [],
