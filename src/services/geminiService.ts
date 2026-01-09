@@ -1,180 +1,220 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 
-/**
- * UTILITY: Auto-Retry Wrapper
- * If Google says "Overloaded" (503) or "Too Many Requests" (429),
- * we wait a few seconds and try again automatically.
- */
-async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delay = 1000): Promise<Response> {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const response = await fetch(url, options);
-      
-      // If success, return immediately
-      if (response.ok) return response;
+// Recommended default model for grading: fast + cheap + good enough
+const DEFAULT_MODEL = import.meta.env.VITE_GEMINI_MODEL || "gemini-1.5-flash";
 
-      // If it's NOT a traffic error (e.g., 404 Not Found, 401 Bad Key), fail immediately
-      if (response.status !== 503 && response.status !== 429) {
-        return response; 
-      }
-
-      // If we are here, it's a traffic error. Wait and retry.
-      console.warn(`⚠️ Google is busy (Attempt ${i + 1}/${retries}). Retrying in ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
-      // Increase delay for next time (Exponential Backoff: 1s -> 2s -> 4s)
-      delay *= 2;
-
-    } catch (err) {
-      // Network errors (like WiFi disconnect) also trigger retries
-      if (i === retries - 1) throw err;
-    }
-  }
-  throw new Error("Max retries reached. Google is still overloaded.");
+if (!API_KEY) {
+  // Don't crash build, but make it obvious at runtime
+  console.warn(
+    "[PilotForge] VITE_GEMINI_API_KEY is missing. AI grading will fail until it is set in Vercel env vars."
+  );
 }
 
-/**
- * UTILITY: Model Hunter
- * Finds the best available model for your key.
- */
-async function findWorkingModel(baseUrl: string): Promise<string> {
-  try {
-    const listUrl = `${baseUrl}/models?key=${API_KEY}`;
-    const response = await fetch(listUrl);
-    const data = await response.json();
+const genAI = new GoogleGenerativeAI(API_KEY);
 
-    if (!data.models) return "models/gemini-pro"; 
+export interface GradingResult {
+  score: number;
+  feedback: string;
+  strengths: string[];
+  improvements: string[];
+}
 
-    // Filter for models that support generating content
-    const validModels = data.models.filter((m: any) => 
-      m.supportedGenerationMethods?.includes("generateContent") &&
-      m.name.includes("gemini")
+export interface JourneyReview {
+  score: number; // 0-100
+  feedback: string; // 2-4 sentences
+  strengths: string[];
+  improvements: string[];
+  nextActions: string[];
+  pass: boolean;
+}
+
+// -----------------------------
+// Helpers
+// -----------------------------
+function ensureApiKey() {
+  if (!API_KEY) {
+    throw new Error(
+      "Gemini API key missing. Set VITE_GEMINI_API_KEY in Vercel Environment Variables."
     );
-
-    // Prefer Pro (Stable) -> Flash (Fast) -> Any
-    const bestModel = 
-      validModels.find((m: any) => m.name.includes("pro")) ||
-      validModels.find((m: any) => m.name.includes("flash")) ||
-      validModels[0];
-
-    return bestModel ? bestModel.name : "models/gemini-pro";
-
-  } catch (e) {
-    return "models/gemini-pro";
   }
 }
 
-/**
- * HELPER: Tooltips
- */
-export const getJobSpecificContext = async (role: string, domain: string, tool: string) => {
+function extractJson(text: string): any {
+  // 1) Remove markdown fences if any
+  const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+
+  // 2) Try direct parse
   try {
-    if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
+    return JSON.parse(cleaned);
+  } catch (_) {
+    // 3) Try extracting JSON object substring
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      const maybeJson = cleaned.slice(firstBrace, lastBrace + 1);
+      return JSON.parse(maybeJson);
+    }
+    // 4) Try extracting JSON array substring (rare)
+    const firstBracket = cleaned.indexOf("[");
+    const lastBracket = cleaned.lastIndexOf("]");
+    if (firstBracket >= 0 && lastBracket > firstBracket) {
+      const maybeJson = cleaned.slice(firstBracket, lastBracket + 1);
+      return JSON.parse(maybeJson);
+    }
+    throw new Error("AI returned non-JSON output. Raw response: " + cleaned.slice(0, 200));
+  }
+}
 
-    const baseUrl = "https://generativelanguage.googleapis.com/v1beta";
-    const modelName = await findWorkingModel(baseUrl);
-    const url = `${baseUrl}/${modelName}:generateContent?key=${API_KEY}`;
-    
-    // USE RETRY HERE
-    const response = await fetchWithRetry(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: `Explain why learning ${tool} is critical for a ${role} in ${domain} in the context of the Indian market. Max 50 words.` }] }]
-      })
-    });
+function clampScore(x: any): number {
+  const n = typeof x === "number" ? x : parseFloat(x);
+  if (Number.isNaN(n)) return 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
 
-    const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Automates core workflows.";
-    
-  } catch (error) {
-    return `Mastering ${tool} allows a ${role} to automate core workflows in the Indian ${domain} sector.`;
+// -----------------------------
+// Case submission grading
+// -----------------------------
+export const evaluateSubmission = async (
+  studentSubmission: string,
+  caseContext: any
+): Promise<GradingResult> => {
+  try {
+    ensureApiKey();
+
+    const model = genAI.getGenerativeModel({ model: DEFAULT_MODEL });
+
+    const prompt = `
+You are a strict Professor evaluating a Case Study submission.
+
+CASE CONTEXT:
+Title: ${caseContext.title}
+Scenario: ${caseContext.description}
+Strategic Questions to Answer: ${JSON.stringify(caseContext.content?.strategicQuestions || [])}
+
+STUDENT SUBMISSION:
+"""
+${studentSubmission}
+"""
+
+TASK:
+Grade this submission on a scale of 0-100 based on:
+1. Analytical Depth (Did they use data?)
+2. Strategic Alignment (Does it solve the business crisis?)
+3. Clarity.
+
+OUTPUT FORMAT:
+Return ONLY raw JSON (no markdown, no extra keys):
+{
+  "score": 85,
+  "feedback": "2-sentence summary.",
+  "strengths": ["Point 1", "Point 2"],
+  "improvements": ["Missed Point 1", "Missed Point 2"]
+}
+`.trim();
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    const parsed = extractJson(text);
+
+    return {
+      score: clampScore(parsed.score),
+      feedback: parsed.feedback || "",
+      strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
+      improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
+    };
+  } catch (error: any) {
+    console.error("Grading failed:", error);
+    return {
+      score: 0,
+      feedback:
+        error?.message ||
+        "Error grading submission. Please try again. (Admin: check Gemini model + API key.)",
+      strengths: [],
+      improvements: [],
+    };
   }
 };
 
-/**
- * MAIN ENGINE: Case Study Generator
- */
-export const generateAILearningContent = async (topic: string, domain: string) => {
+// -----------------------------
+// Journey grading (Week-by-week)
+// -----------------------------
+export const evaluateJourneyWeek = async (
+  submissionText: string,
+  weekContext: {
+    weekNo: number;
+    title: string;
+    outcome?: string;
+    deliverables: string[];
+    rubric: any;
+  }
+): Promise<JourneyReview> => {
   try {
-    if (!API_KEY) throw new Error("VITE_GEMINI_API_KEY is missing");
+    ensureApiKey();
 
-    const baseUrl = "https://generativelanguage.googleapis.com/v1beta";
-    const modelName = await findWorkingModel(baseUrl);
-    console.log("🚀 Using Model:", modelName);
-
-    const url = `${baseUrl}/${modelName}:generateContent?key=${API_KEY}`;
+    const model = genAI.getGenerativeModel({ model: DEFAULT_MODEL });
 
     const prompt = `
-      Act as a Professor at a top Indian Business School. 
-      Create a 'Harvard-Style' Case Study for: "${topic}" in domain "${domain}".
-      
-      CRITICAL INSTRUCTIONS:
-      1. Context must be strictly INDIAN (use specific cities like Mumbai/Bangalore, currency INR, GST, etc.).
-      2. The story must involve a Crisis.
-      3. The solution must require DATA ANALYTICS.
-      
-      OUTPUT FORMAT:
-      Return ONLY a raw JSON object. Do not include markdown formatting (like \`\`\`json).
-      
-      The JSON must match this structure exactly:
-      {
-        "caseTitle": "Catchy Title",
-        "protagonist": "Name and Role",
-        "companyContext": "Context description",
-        "narrative": "3-paragraph story",
-        "strategicQuestions": ["Question 1", "Question 2", "Question 3", "Question 4", "Question 5"],
-        "datasetContext": {
-          "filename": "data.csv",
-          "columns": ["Col1", "Col2"],
-          "messyFactors": ["Error 1", "Error 2"],
-          "previewRows": [
-             "{\"col1\": \"val1\", \"col2\": \"val2\"}",
-             "{\"col1\": \"val1\", \"col2\": \"val2\"}",
-             "{\"col1\": \"val1\", \"col2\": \"val2\"}"
-          ]
-        },
-        "modules": [
-          { "title": "Module 1", "description": "Desc", "technicalSkill": "Skill" },
-          { "title": "Module 2", "description": "Desc", "technicalSkill": "Skill" }
-        ]
-      }
-    `;
+You are a strict but fair reviewer for an outcome-based AI apprenticeship.
 
-    // USE RETRY HERE
-    const response = await fetchWithRetry(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
-    });
+WEEK CONTEXT:
+Week: ${weekContext.weekNo}
+Title: ${weekContext.title}
+Outcome: ${weekContext.outcome || ""}
+Expected Deliverables: ${JSON.stringify(weekContext.deliverables)}
 
-    if (!response.ok) {
-      const errData = await response.json();
-      throw new Error(errData.error?.message || "API Request Failed");
-    }
+RUBRIC (use this to score):
+${JSON.stringify(weekContext.rubric)}
 
-    const data = await response.json();
-    
-    if (!data.candidates || !data.candidates[0].content) {
-        throw new Error("AI returned empty response. Try again.");
-    }
+SUBMISSION:
+"""
+${submissionText}
+"""
 
-    const text = data.candidates[0].content.parts[0].text;
-    const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+TASK:
+1) Grade the submission on 0-100 (integer).
+2) Provide strengths, improvements, and exactly 5 concrete next actions.
+3) Mark pass=true only if it meets the week's bar.
 
-    return JSON.parse(cleanedText);
+OUTPUT FORMAT:
+Return ONLY raw JSON (no markdown, no commentary):
+{
+  "score": 82,
+  "feedback": "2-4 sentences.",
+  "strengths": ["..."],
+  "improvements": ["..."],
+  "nextActions": ["...","...","...","...","..."],
+  "pass": true
+}
+`.trim();
 
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    const parsed = extractJson(text);
+
+    return {
+      score: clampScore(parsed.score),
+      feedback: parsed.feedback || "",
+      strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
+      improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
+      nextActions: Array.isArray(parsed.nextActions) ? parsed.nextActions.slice(0, 5) : [],
+      pass: !!parsed.pass,
+    };
   } catch (error: any) {
-    console.error("Content Gen Error:", error);
-    
-    return { 
-      caseTitle: "Service Unreachable", 
-      narrative: `TECHNICAL ERROR: ${error?.message || "Google is currently overloaded. Please wait 1 minute and try again."}`,
-      strategicQuestions: [], 
-      modules: [],
-      datasetContext: { filename: "error.csv", columns: [], messyFactors: [], previewRows: [] }
+    console.error("Journey grading failed:", error);
+
+    return {
+      score: 0,
+      feedback:
+        error?.message ||
+        "AI grading failed. Admin: verify VITE_GEMINI_API_KEY and VITE_GEMINI_MODEL (recommended gemini-1.5-flash).",
+      strengths: [],
+      improvements: [],
+      nextActions: [],
+      pass: false,
     };
   }
 };
