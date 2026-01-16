@@ -22,6 +22,16 @@ export const saveUserProfile = async (profile: UserProfile) => {
         goal: profile.goal,
         availability: profile.availability,
 
+        // Persona bindings (v1)
+        primaryPersona: profile.primaryPersona || 'UNKNOWN',
+        secondaryPersona: profile.secondaryPersona || 'UNKNOWN',
+        kpisOwned: profile.kpisOwned || [],
+        decisionsMade: profile.decisionsMade || [],
+        diagnosticScore: profile.diagnosticScore || 60,
+
+        activeSkillTreeId: profile.activeSkillTreeId || null,
+        activeProgramId: profile.activeProgramId || null,
+
         // PilotForge Journey Progress (v1)
         programProgress: (profile as any).programProgress || null
       }
@@ -62,6 +72,16 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
     domainPreference: data.profile_data?.domainPreference || 'ops',
     track: data.profile_data?.track || LearningTrack.ANALYST,
     verifiedSkills: data.profile_data?.verifiedSkills || [],
+
+    // Persona-aware bindings
+    primaryPersona: data.profile_data?.primaryPersona || 'UNKNOWN',
+    secondaryPersona: data.profile_data?.secondaryPersona || 'UNKNOWN',
+    kpisOwned: data.profile_data?.kpisOwned || [],
+    decisionsMade: data.profile_data?.decisionsMade || [],
+    diagnosticScore: data.profile_data?.diagnosticScore || 60,
+
+    activeSkillTreeId: data.profile_data?.activeSkillTreeId || undefined,
+    activeProgramId: data.profile_data?.activeProgramId || undefined,
 
     // PilotForge Journey Progress (v1)
     ...(data.profile_data?.programProgress ? { programProgress: data.profile_data.programProgress as ProgramProgress } : {})
