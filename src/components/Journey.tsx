@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { UserProfile, ProgramProgress, ProgramWeek } from "../types";
-import { OPS_9W_PROGRAM_ID, OPS_9W_WEEKS } from "../constants";
+import { OPS_9W_PROGRAM_ID, getProgramWeeks } from "../constants";
 import { evaluateJourneyWeek, JourneyReview } from "../services/gradingService";
 import { saveUserProfile } from "../services/userService";
 
@@ -58,8 +58,8 @@ function toYoutubeEmbed(url: string) {
 }
 
 const Journey: React.FC<JourneyProps> = ({ profile, onProfileUpdate }) => {
-  const programId = OPS_9W_PROGRAM_ID;
-  const weeks = OPS_9W_WEEKS;
+  const programId = profile.activeProgramId || OPS_9W_PROGRAM_ID;
+  const weeks = useMemo(() => getProgramWeeks(profile.activeProgramId || OPS_9W_PROGRAM_ID), [profile.activeProgramId]);
 
   const progress = useMemo<ProgramProgress>(() => {
     if (profile.programProgress?.programId === programId) return profile.programProgress;
