@@ -21,6 +21,27 @@ export interface UserProfile {
   verifiedSkills: string[];
   masteryScore: number;
 
+  // -------------------------------------------------
+  // PilotForge v1+: Persona-aware learning experience
+  // -------------------------------------------------
+  primaryPersona?:
+    | 'DEMAND_PLANNING_MANAGER'
+    | 'INVENTORY_SERVICE_LEVEL_OWNER'
+    | 'UNKNOWN';
+  secondaryPersona?:
+    | 'DEMAND_PLANNING_MANAGER'
+    | 'INVENTORY_SERVICE_LEVEL_OWNER'
+    | 'UNKNOWN';
+
+  // Intake signals used for persona inference (v1 rules-first)
+  kpisOwned?: string[]; // e.g., ['forecast_accuracy','stockouts']
+  decisionsMade?: string[]; // e.g., ['forecasting','safety_stock']
+  diagnosticScore?: number; // 0..100
+
+  // Active content bindings
+  activeSkillTreeId?: string; // e.g., 'ops-demand-planning-v1'
+  activeProgramId?: string; // e.g., 'ops-demand-9w-v1'
+
   // v1 Journey (optional for backward compatibility)
   programProgress?: ProgramProgress;
 }
