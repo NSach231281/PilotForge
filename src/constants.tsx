@@ -111,6 +111,268 @@ export const SKILL_NODES: SkillNode[] = [
   }
 ];
 
+// -------------------------------------------------
+// PilotForge v1+: Ops/SC persona-specific Skill Trees
+// Focus: Statistical Modeling → ML → OR/Optimization
+// -------------------------------------------------
+
+export const OPS_DEMAND_SKILL_TREE_ID = 'ops-demand-planning-v1';
+export const OPS_INVENTORY_SKILL_TREE_ID = 'ops-inventory-service-v1';
+
+// Shared nodes across Ops personas
+const OPS_SHARED_NODES: SkillNode[] = [
+  {
+    id: 'data-hygiene',
+    label: 'Data Hygiene',
+    description: 'Fixing messy spreadsheets & automated normalization.',
+    status: SkillStatus.UNLOCKED,
+    dependencies: [],
+    category: 'foundation',
+    domain: 'ops',
+    difficulty: 'beginner',
+    x: 120,
+    y: 260,
+  },
+  {
+    id: 'kpi-error-diagnostics',
+    label: 'KPI & Error Diagnostics',
+    description: 'MAPE/WAPE/MASE, bias checks, and decision-ready evaluation.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['data-hygiene'],
+    category: 'foundation',
+    domain: 'ops',
+    difficulty: 'beginner',
+    x: 420,
+    y: 260,
+  },
+  {
+    id: 'sku-segmentation-abcxyz',
+    label: 'SKU Segmentation (ABC-XYZ)',
+    description: 'Segment SKUs by value and variability to pick the right model/policy.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['kpi-error-diagnostics'],
+    category: 'business',
+    domain: 'ops',
+    difficulty: 'intermediate',
+    x: 720,
+    y: 260,
+  },
+];
+
+// Persona A: Demand & Planning Manager
+export const OPS_DEMAND_NODES: SkillNode[] = [
+  ...OPS_SHARED_NODES,
+  {
+    id: 'stat-forecast-baselines',
+    label: 'Stat Forecast Baselines',
+    description: 'ETS/ARIMA-style baselines + backtesting you can explain to leadership.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['sku-segmentation-abcxyz'],
+    category: 'business',
+    domain: 'ops',
+    difficulty: 'intermediate',
+    x: 260,
+    y: 420,
+  },
+  {
+    id: 'india-seasonality-festivals',
+    label: 'India Seasonality & Festivals',
+    description: 'Festival/monsoon regressors and uplift logic for Indian demand patterns.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['stat-forecast-baselines'],
+    category: 'business',
+    domain: 'ops',
+    difficulty: 'intermediate',
+    x: 560,
+    y: 420,
+  },
+  {
+    id: 'ml-forecasting-features',
+    label: 'ML Forecasting (Features)',
+    description: 'Lag features, tree models, and guardrails for stable ML forecasts.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['india-seasonality-festivals'],
+    category: 'tool',
+    domain: 'ops',
+    difficulty: 'intermediate',
+    x: 860,
+    y: 420,
+  },
+  {
+    id: 'hierarchical-reconciliation',
+    label: 'Hierarchy Reconciliation',
+    description: 'SKU→Category→Region consistency (top-down/bottom-up thinking).',
+    status: SkillStatus.LOCKED,
+    dependencies: ['ml-forecasting-features'],
+    category: 'tool',
+    domain: 'ops',
+    difficulty: 'advanced',
+    x: 260,
+    y: 580,
+  },
+  {
+    id: 'demand-sensing-signals',
+    label: 'Demand Sensing',
+    description: 'Weekly nowcasting using signals + blending with the base forecast.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['hierarchical-reconciliation'],
+    category: 'advanced',
+    domain: 'ops',
+    difficulty: 'advanced',
+    x: 560,
+    y: 580,
+  },
+  {
+    id: 'scenario-planning',
+    label: 'Scenario Planning',
+    description: 'Base/upside/downside scenarios with decision triggers.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['demand-sensing-signals'],
+    category: 'advanced',
+    domain: 'ops',
+    difficulty: 'advanced',
+    x: 860,
+    y: 580,
+  },
+  {
+    id: 'snop-optimization-lite',
+    label: 'S&OP Optimization (OR)',
+    description: 'Constraint-based planning (LP-lite) for capacity, MOQ, and service.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['scenario-planning'],
+    category: 'advanced',
+    domain: 'ops',
+    difficulty: 'advanced',
+    x: 560,
+    y: 740,
+  },
+  {
+    id: 'deployment-final',
+    label: 'Pilot Deployment',
+    description: 'Automate outputs into a repeatable business workflow.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['snop-optimization-lite'],
+    category: 'advanced',
+    domain: 'shared',
+    difficulty: 'advanced',
+    x: 860,
+    y: 740,
+  },
+];
+
+// Persona B: Inventory / Service-Level Owner
+export const OPS_INVENTORY_NODES: SkillNode[] = [
+  ...OPS_SHARED_NODES,
+  {
+    id: 'variability-leadtime-modeling',
+    label: 'Variability & Lead Time',
+    description: 'Model demand/lead-time variability and service level definitions.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['sku-segmentation-abcxyz'],
+    category: 'business',
+    domain: 'ops',
+    difficulty: 'intermediate',
+    x: 260,
+    y: 420,
+  },
+  {
+    id: 'safety-stock-statistical',
+    label: 'Safety Stock (Stat)',
+    description: 'z-factor, CSL vs fill-rate, and practical buffer setting.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['variability-leadtime-modeling'],
+    category: 'tool',
+    domain: 'ops',
+    difficulty: 'intermediate',
+    x: 560,
+    y: 420,
+  },
+  {
+    id: 'replenishment-policy-rop',
+    label: 'Replenishment Policy',
+    description: 'ROP/Min-Max policies with review cycles and exceptions.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['safety-stock-statistical'],
+    category: 'tool',
+    domain: 'ops',
+    difficulty: 'intermediate',
+    x: 860,
+    y: 420,
+  },
+  {
+    id: 'intermittent-demand-overrides',
+    label: 'Intermittent Demand',
+    description: 'Spare-parts style demand with policy overrides and segmentation.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['replenishment-policy-rop'],
+    category: 'tool',
+    domain: 'ops',
+    difficulty: 'advanced',
+    x: 260,
+    y: 580,
+  },
+  {
+    id: 'cost-service-tradeoff',
+    label: 'Cost–Service Trade-off',
+    description: 'Holding vs stockout vs expedite risk trade-offs with clear curves.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['intermittent-demand-overrides'],
+    category: 'business',
+    domain: 'ops',
+    difficulty: 'advanced',
+    x: 560,
+    y: 580,
+  },
+  {
+    id: 'inventory-optimization-or',
+    label: 'Inventory Optimization (OR)',
+    description: 'LP/MILP formulation to minimize cost while meeting service + risk constraints.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['cost-service-tradeoff'],
+    category: 'advanced',
+    domain: 'ops',
+    difficulty: 'advanced',
+    x: 860,
+    y: 580,
+  },
+  {
+    id: 'meio-lite',
+    label: 'MEIO-lite (Multi-node)',
+    description: 'Allocate buffers across nodes with network constraints and pooling logic.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['inventory-optimization-or'],
+    category: 'advanced',
+    domain: 'ops',
+    difficulty: 'advanced',
+    x: 560,
+    y: 740,
+  },
+  {
+    id: 'deployment-final',
+    label: 'Pilot Deployment',
+    description: 'Automate outputs into a repeatable business workflow.',
+    status: SkillStatus.LOCKED,
+    dependencies: ['meio-lite'],
+    category: 'advanced',
+    domain: 'shared',
+    difficulty: 'advanced',
+    x: 860,
+    y: 740,
+  },
+];
+
+export const SKILL_TREES: Record<string, SkillNode[]> = {
+  // legacy
+  legacy: SKILL_NODES,
+  [OPS_DEMAND_SKILL_TREE_ID]: OPS_DEMAND_NODES,
+  [OPS_INVENTORY_SKILL_TREE_ID]: OPS_INVENTORY_NODES,
+};
+
+export const getSkillTreeNodes = (skillTreeId?: string): SkillNode[] => {
+  if (skillTreeId && SKILL_TREES[skillTreeId]) return SKILL_TREES[skillTreeId];
+  return SKILL_NODES;
+};
+
 export const MOCK_USE_CASES: UseCase[] = [
   {
     id: 'uc-ops-1',
@@ -346,3 +608,409 @@ export const OPS_9W_WEEKS: ProgramWeek[] = [
     }
   }
 ];
+
+// -------------------------------------------------
+// Persona-specific 9-week journeys (v1)
+// -------------------------------------------------
+
+export const OPS_DEMAND_9W_PROGRAM_ID = 'ops-demand-9w-v1';
+export const OPS_INVENTORY_9W_PROGRAM_ID = 'ops-inventory-9w-v1';
+
+export const OPS_DEMAND_9W_WEEKS: ProgramWeek[] = [
+  {
+    programId: OPS_DEMAND_9W_PROGRAM_ID,
+    weekNo: 0,
+    title: 'Onboarding + Diagnostic (2–3 days)',
+    outcome: 'Lock your forecasting pilot, success metric, and data readiness.',
+    deliverables: [
+      'Pilot choice: Forecasting (SKU/Region)',
+      'Success metric + target (e.g., improve WAPE by X)',
+      'Data readiness (A/B/C) + missing fields list',
+      'Commitment: hours/week + sprint calendar'
+    ],
+    rubric: {
+      overallPassScore: 70,
+      criteria: [
+        { key: 'clarity', label: 'Clarity', max: 5 },
+        { key: 'measurability', label: 'Measurability', max: 5 },
+        { key: 'feasibility', label: 'Feasibility', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_DEMAND_9W_PROGRAM_ID,
+    weekNo: 1,
+    title: 'Data Hygiene + KPI Definitions',
+    outcome: 'A clean demand table + decision-grade forecast KPIs.',
+    deliverables: [
+      'Cleaned demand dataset (grain locked: SKU×Region×Week/Month)',
+      'Data quality report (missingness/outliers/duplicates)',
+      'Forecast KPI dashboard (WAPE, bias, service impact narrative)'
+    ],
+    rubric: {
+      overallPassScore: 75,
+      criteria: [
+        { key: 'quality', label: 'Data quality handling', max: 5 },
+        { key: 'grain', label: 'Correct data grain', max: 5 },
+        { key: 'kpi', label: 'KPI correctness', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_DEMAND_9W_PROGRAM_ID,
+    weekNo: 2,
+    title: 'Stat Baselines + Backtesting',
+    outcome: 'A baseline forecast that is explainable and measurable.',
+    deliverables: [
+      'Baseline models (at least 2) + backtest comparison',
+      'Error analysis by SKU segment (ABC-XYZ)',
+      'Business interpretation: why baseline wins/loses'
+    ],
+    rubric: {
+      overallPassScore: 75,
+      criteria: [
+        { key: 'baseline', label: 'Baseline soundness', max: 5 },
+        { key: 'backtest', label: 'Backtesting rigor', max: 5 },
+        { key: 'insight', label: 'Insights & actions', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_DEMAND_9W_PROGRAM_ID,
+    weekNo: 3,
+    title: 'India Seasonality (Festival/Monsoon)',
+    outcome: 'A seasonality-aware forecast with a clear story.',
+    deliverables: [
+      'Festival/monsoon features added (calendar regressors)',
+      'Uplift logic: how much does the festival explain?',
+      'Explainable narrative: assumptions + limitations'
+    ],
+    rubric: {
+      overallPassScore: 70,
+      criteria: [
+        { key: 'features', label: 'Feature logic', max: 5 },
+        { key: 'evidence', label: 'Evidence of uplift', max: 5 },
+        { key: 'story', label: 'Story clarity', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_DEMAND_9W_PROGRAM_ID,
+    weekNo: 4,
+    title: 'ML Forecasting (Lag Features)',
+    outcome: 'A stable ML model that beats baseline responsibly.',
+    deliverables: [
+      'Feature set (lags/rolling stats/promotions optional)',
+      'Model (tree-based) + validation strategy',
+      'Feature importance + guardrails (no crazy spikes)'
+    ],
+    rubric: {
+      overallPassScore: 75,
+      criteria: [
+        { key: 'lift', label: 'Lift over baseline', max: 5 },
+        { key: 'validation', label: 'Validation rigor', max: 5 },
+        { key: 'stability', label: 'Stability/guardrails', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_DEMAND_9W_PROGRAM_ID,
+    weekNo: 5,
+    title: 'Hierarchy Reconciliation',
+    outcome: 'SKU/Region forecasts reconcile to category/total plans.',
+    deliverables: [
+      'Reconciliation approach + comparison table',
+      'Where reconciliation helps/hurts + why',
+      'Decision policy: what business uses which level'
+    ],
+    rubric: {
+      overallPassScore: 70,
+      criteria: [
+        { key: 'consistency', label: 'Consistency achieved', max: 5 },
+        { key: 'analysis', label: 'Analysis quality', max: 5 },
+        { key: 'policy', label: 'Decision policy', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_DEMAND_9W_PROGRAM_ID,
+    weekNo: 6,
+    title: 'Demand Sensing (Weekly Updates)',
+    outcome: 'A sensing layer that updates forecasts using signals.',
+    deliverables: [
+      'Sensing formula/blend logic (signals + base forecast)',
+      'Simulation on last N weeks: does it reduce error?',
+      'Operational plan: how often and who triggers updates'
+    ],
+    rubric: {
+      overallPassScore: 70,
+      criteria: [
+        { key: 'logic', label: 'Logic soundness', max: 5 },
+        { key: 'value', label: 'Value evidence', max: 5 },
+        { key: 'ops', label: 'Operational feasibility', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_DEMAND_9W_PROGRAM_ID,
+    weekNo: 7,
+    title: 'Scenario Planning + Sensitivity',
+    outcome: 'You know when your forecast can be trusted and what-if actions.',
+    deliverables: [
+      '3 scenarios (base/upside/downside) + trigger thresholds',
+      'Sensitivity on 2–3 key features',
+      'Exec-ready scenario playbook (1–2 pages)'
+    ],
+    rubric: {
+      overallPassScore: 70,
+      criteria: [
+        { key: 'scenarios', label: 'Scenario quality', max: 5 },
+        { key: 'sensitivity', label: 'Sensitivity clarity', max: 5 },
+        { key: 'comms', label: 'Communication', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_DEMAND_9W_PROGRAM_ID,
+    weekNo: 8,
+    title: 'S&OP Optimization (LP-lite)',
+    outcome: 'A constraint-based plan recommendation (capacity/MOQ/service).',
+    deliverables: [
+      'Optimization formulation (variables/objective/constraints)',
+      'Solution output + interpretation',
+      'Risk/service narrative: why this is implementable'
+    ],
+    rubric: {
+      overallPassScore: 75,
+      criteria: [
+        { key: 'formulation', label: 'Formulation clarity', max: 5 },
+        { key: 'interpret', label: 'Interpretation', max: 5 },
+        { key: 'feasible', label: 'Feasibility', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_DEMAND_9W_PROGRAM_ID,
+    weekNo: 9,
+    title: 'Portfolio Final + Deployment Checklist',
+    outcome: 'Publish a portfolio-ready case and next-30-day roadmap.',
+    deliverables: [
+      'Portfolio pack (Problem → Method → Results → ROI → Learnings)',
+      'LinkedIn-ready summary (300–500 words)',
+      'Deployment/runbook checklist (data refresh, monitoring, governance)'
+    ],
+    rubric: {
+      overallPassScore: 80,
+      criteria: [
+        { key: 'portfolio', label: 'Portfolio quality', max: 5 },
+        { key: 'impact', label: 'Impact articulation', max: 5 },
+        { key: 'next', label: 'Next steps clarity', max: 5 },
+      ],
+    },
+  },
+];
+
+export const OPS_INVENTORY_9W_WEEKS: ProgramWeek[] = [
+  {
+    programId: OPS_INVENTORY_9W_PROGRAM_ID,
+    weekNo: 0,
+    title: 'Onboarding + Diagnostic (2–3 days)',
+    outcome: 'Lock your inventory pilot, service targets, and data readiness.',
+    deliverables: [
+      'Pilot choice: Inventory buffers & replenishment',
+      'Success metric + target (stockouts ↓, fill-rate ↑, inventory turns ↑)',
+      'Data readiness (A/B/C) + missing fields list',
+      'Commitment: hours/week + sprint calendar'
+    ],
+    rubric: {
+      overallPassScore: 70,
+      criteria: [
+        { key: 'clarity', label: 'Clarity', max: 5 },
+        { key: 'measurability', label: 'Measurability', max: 5 },
+        { key: 'feasibility', label: 'Feasibility', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_INVENTORY_9W_PROGRAM_ID,
+    weekNo: 1,
+    title: 'Data Hygiene + Service KPIs',
+    outcome: 'A clean inventory dataset + service KPI definitions.',
+    deliverables: [
+      'Cleaned inventory dataset (SKU×Node×Day/Week)',
+      'DQ report (missingness/outliers/lead-time anomalies)',
+      'Service KPI dashboard (CSL/fill-rate/backorders)'
+    ],
+    rubric: {
+      overallPassScore: 75,
+      criteria: [
+        { key: 'quality', label: 'Data quality handling', max: 5 },
+        { key: 'kpi', label: 'KPI correctness', max: 5 },
+        { key: 'grain', label: 'Correct grain', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_INVENTORY_9W_PROGRAM_ID,
+    weekNo: 2,
+    title: 'Variability + Lead Time Modeling',
+    outcome: 'A variability profile that drives buffer decisions.',
+    deliverables: [
+      'Demand variability per SKU segment (ABC-XYZ)',
+      'Lead time distribution assumptions + checks',
+      'Where variability comes from + what to do'
+    ],
+    rubric: {
+      overallPassScore: 70,
+      criteria: [
+        { key: 'variability', label: 'Variability modeling', max: 5 },
+        { key: 'leadtime', label: 'Lead time rigor', max: 5 },
+        { key: 'insight', label: 'Insights & actions', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_INVENTORY_9W_PROGRAM_ID,
+    weekNo: 3,
+    title: 'Safety Stock Engine (Statistical)',
+    outcome: 'A defensible safety stock recommendation per SKU/node.',
+    deliverables: [
+      'Safety stock calculator (CSL or fill-rate based)',
+      'Policy table: target service by segment',
+      'Assumptions + exceptions list'
+    ],
+    rubric: {
+      overallPassScore: 75,
+      criteria: [
+        { key: 'logic', label: 'Logic correctness', max: 5 },
+        { key: 'segmentation', label: 'Segmentation use', max: 5 },
+        { key: 'assumptions', label: 'Assumption clarity', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_INVENTORY_9W_PROGRAM_ID,
+    weekNo: 4,
+    title: 'Replenishment Policy (ROP / Min-Max)',
+    outcome: 'A workable ordering policy with review cycles.',
+    deliverables: [
+      'ROP/Min-Max policy per segment',
+      'Simulation for last N periods: stockouts vs holding',
+      'Operational SOP: who runs it, when, and how'
+    ],
+    rubric: {
+      overallPassScore: 70,
+      criteria: [
+        { key: 'policy', label: 'Policy soundness', max: 5 },
+        { key: 'simulation', label: 'Simulation evidence', max: 5 },
+        { key: 'ops', label: 'Operational feasibility', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_INVENTORY_9W_PROGRAM_ID,
+    weekNo: 5,
+    title: 'Cost–Service–Risk Trade-offs',
+    outcome: 'Explicit trade-off curves that align finance and operations.',
+    deliverables: [
+      'Holding vs stockout vs expedite penalties defined',
+      'Trade-off curve (service vs cost) by segment',
+      'Decision rule: what service level is worth it?'
+    ],
+    rubric: {
+      overallPassScore: 70,
+      criteria: [
+        { key: 'costs', label: 'Cost modeling', max: 5 },
+        { key: 'tradeoff', label: 'Trade-off clarity', max: 5 },
+        { key: 'decision', label: 'Decision rule', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_INVENTORY_9W_PROGRAM_ID,
+    weekNo: 6,
+    title: 'Intermittent Demand Overrides',
+    outcome: 'Policies for spare parts / lumpy demand that don’t break.',
+    deliverables: [
+      'Intermittent SKU identification rules',
+      'Override policies + exception handling',
+      'Impact analysis: what changes vs normal policy'
+    ],
+    rubric: {
+      overallPassScore: 70,
+      criteria: [
+        { key: 'identification', label: 'Identification logic', max: 5 },
+        { key: 'policy', label: 'Policy quality', max: 5 },
+        { key: 'impact', label: 'Impact analysis', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_INVENTORY_9W_PROGRAM_ID,
+    weekNo: 7,
+    title: 'Optimization Formulation (LP/MILP)',
+    outcome: 'A full OR formulation balancing cost + service + risk.',
+    deliverables: [
+      'Variables/objective/constraints clearly written',
+      'Solved output + interpretation',
+      'Sensitivity: which constraint is binding and why'
+    ],
+    rubric: {
+      overallPassScore: 75,
+      criteria: [
+        { key: 'formulation', label: 'Formulation clarity', max: 5 },
+        { key: 'interpret', label: 'Interpretation', max: 5 },
+        { key: 'sensitivity', label: 'Sensitivity', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_INVENTORY_9W_PROGRAM_ID,
+    weekNo: 8,
+    title: 'MEIO-lite (Multi-node Allocation)',
+    outcome: 'Allocate buffers across nodes with pooling logic.',
+    deliverables: [
+      'Multi-node model assumptions + constraints',
+      'Allocation output + service impact',
+      'Implementation SOP: how to roll out node-by-node'
+    ],
+    rubric: {
+      overallPassScore: 75,
+      criteria: [
+        { key: 'model', label: 'Model soundness', max: 5 },
+        { key: 'impact', label: 'Impact articulation', max: 5 },
+        { key: 'ops', label: 'Operational feasibility', max: 5 },
+      ],
+    },
+  },
+  {
+    programId: OPS_INVENTORY_9W_PROGRAM_ID,
+    weekNo: 9,
+    title: 'Portfolio Final + Deployment Checklist',
+    outcome: 'Publish a portfolio-ready inventory case and roadmap.',
+    deliverables: [
+      'Portfolio pack (Problem → Policy → OR → Results → ROI)',
+      'LinkedIn-ready summary (300–500 words)',
+      'Next 30-day rollout plan (data refresh, governance, adoption)'
+    ],
+    rubric: {
+      overallPassScore: 80,
+      criteria: [
+        { key: 'portfolio', label: 'Portfolio quality', max: 5 },
+        { key: 'impact', label: 'Impact articulation', max: 5 },
+        { key: 'next', label: 'Next steps clarity', max: 5 },
+      ],
+    },
+  },
+];
+
+export const PROGRAM_WEEKS: Record<string, ProgramWeek[]> = {
+  [OPS_9W_PROGRAM_ID]: OPS_9W_WEEKS, // legacy
+  [OPS_DEMAND_9W_PROGRAM_ID]: OPS_DEMAND_9W_WEEKS,
+  [OPS_INVENTORY_9W_PROGRAM_ID]: OPS_INVENTORY_9W_WEEKS,
+};
+
+export const getProgramWeeks = (programId?: string): ProgramWeek[] => {
+  if (programId && PROGRAM_WEEKS[programId]) return PROGRAM_WEEKS[programId];
+  return OPS_9W_WEEKS;
+};
