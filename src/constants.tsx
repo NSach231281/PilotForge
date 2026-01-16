@@ -1014,3 +1014,44 @@ export const getProgramWeeks = (programId?: string): ProgramWeek[] => {
   if (programId && PROGRAM_WEEKS[programId]) return PROGRAM_WEEKS[programId];
   return OPS_9W_WEEKS;
 };
+// -------------------------------------------------
+// Admin Path Library (v1)
+// Admin can preview any persona skill tree + 9-week journey
+// without going through onboarding.
+// -------------------------------------------------
+
+export type AdminPathLibraryItem = {
+  id: string;
+  title: string;
+  description: string;
+  domainPreference: 'ops' | 'marketing';
+  primaryPersona: 'DEMAND_PLANNING_MANAGER' | 'INVENTORY_SERVICE_LEVEL_OWNER';
+  skillTreeId: string;
+  programId: string;
+};
+
+export const ADMIN_PATH_LIBRARY: AdminPathLibraryItem[] = [
+  {
+    id: 'ops-demand-v1',
+    title: 'Ops: Demand Planning Manager',
+    description: 'Stat Forecasting → ML Forecasting → Demand Sensing → S&OP Optimization (OR) → Deployment',
+    domainPreference: 'ops',
+    primaryPersona: 'DEMAND_PLANNING_MANAGER',
+    skillTreeId: OPS_DEMAND_SKILL_TREE_ID,
+    programId: OPS_DEMAND_9W_PROGRAM_ID,
+  },
+  {
+    id: 'ops-inventory-v1',
+    title: 'Ops: Inventory / Service-Level Owner',
+    description: 'Variability → Safety Stock → Replenishment → OR Optimization (LP/MILP) → MEIO-lite → Deployment',
+    domainPreference: 'ops',
+    primaryPersona: 'INVENTORY_SERVICE_LEVEL_OWNER',
+    skillTreeId: OPS_INVENTORY_SKILL_TREE_ID,
+    programId: OPS_INVENTORY_9W_PROGRAM_ID,
+  },
+];
+
+// Optional helpers (useful for dropdowns/debug/admin tooling)
+export const listSkillTreeIds = (): string[] => Object.keys(SKILL_TREES);
+export const listProgramIds = (): string[] => Object.keys(PROGRAM_WEEKS);
+
